@@ -1,0 +1,2931 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Property Analysis · j</title>
+
+<!-- PDF.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<!-- jsPDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #181c27;
+    --surface2: #1e2332;
+    --border: #2a3045;
+    --accent: #3b82f6;
+    --accent2: #10b981;
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --pass: #10b981;
+    --fail: #ef4444;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+  }
+
+  /* ── HEADER ── */
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 14px 24px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+  header h1 {
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    color: var(--text);
+  }
+  header .badge {
+    font-size: 10px;
+    background: var(--accent);
+    color: white;
+    padding: 2px 8px;
+    border-radius: 10px;
+    letter-spacing: 0.1em;
+  }
+
+  /* ── DROP ZONE ── */
+  #dropzone {
+    margin: 32px auto;
+    max-width: 600px;
+    border: 2px dashed var(--border);
+    border-radius: 12px;
+    padding: 48px 32px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: var(--surface);
+  }
+  #dropzone.drag-over {
+    border-color: var(--accent);
+    background: rgba(59,130,246,0.08);
+  }
+  #dropzone .icon { font-size: 40px; margin-bottom: 16px; }
+  #dropzone h2 { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+  #dropzone p { font-size: 13px; color: var(--muted); }
+  #dropzone input { display: none; }
+
+  /* ── PASTE BOX ── */
+  #paste-section {
+    margin: 0 auto 32px;
+    max-width: 600px;
+    text-align: center;
+  }
+  #paste-section p { font-size: 12px; color: var(--muted); margin-bottom: 8px; }
+  #paste-box {
+    width: 100%;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 12px;
+    padding: 12px;
+    resize: vertical;
+    min-height: 80px;
+  }
+  #paste-box:focus { outline: none; border-color: var(--accent); }
+  #parse-paste-btn {
+    margin-top: 8px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    transition: 0.2s;
+  }
+  #parse-paste-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── STATUS ── */
+  #status {
+    max-width: 900px;
+    margin: 0 auto 16px;
+    padding: 0 24px;
+    font-size: 12px;
+    color: var(--muted);
+    min-height: 20px;
+  }
+  #status.parsing { color: var(--warn); }
+  #status.done { color: var(--pass); }
+  #status.error { color: var(--danger); }
+
+  /* ── RESULTS TABLE ── */
+  #results {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 24px 48px;
+  }
+
+  .results-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+  }
+  .results-header h2 { font-size: 14px; font-weight: 600; color: var(--text); }
+  .results-header span { font-size: 12px; color: var(--muted); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+  thead th {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 8px 12px;
+    text-align: left;
+    color: var(--muted);
+    font-weight: 500;
+    letter-spacing: 0.05em;
+    font-size: 11px;
+    white-space: nowrap;
+  }
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+  tbody tr:hover { background: var(--surface2); }
+  tbody td {
+    padding: 9px 12px;
+    border: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .addr { font-weight: 600; color: var(--text); }
+  .price { color: var(--accent); font-weight: 600; }
+
+  .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 600;
+    letter-spacing: 0.05em;
+  }
+  .pill-pass { background: rgba(16,185,129,0.15); color: var(--pass); }
+  .pill-fail { background: rgba(239,68,68,0.15); color: var(--fail); }
+  .pill-warn { background: rgba(245,158,11,0.15); color: var(--warn); }
+  .pill-blue { background: rgba(59,130,246,0.15); color: var(--accent); }
+  .pill-gray { background: rgba(100,116,139,0.15); color: var(--muted); }
+
+  .btn-report {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 5px 12px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 600;
+    transition: 0.15s;
+    white-space: nowrap;
+  }
+  .btn-report:hover { background: #2563eb; }
+
+  /* ── SORTABLE HEADERS ── */
+  thead th.sortable {
+    cursor: pointer;
+    user-select: none;
+    position: relative;
+    padding-right: 20px;
+  }
+  thead th.sortable:hover { color: var(--text); background: #252a3a; }
+  thead th.sort-asc::after  { content: ' ▲'; color: var(--accent); font-size: 9px; position: absolute; right: 5px; top: 50%; transform: translateY(-50%); }
+  thead th.sort-desc::after { content: ' ▼'; color: var(--accent); font-size: 9px; position: absolute; right: 5px; top: 50%; transform: translateY(-50%); }
+
+  /* ── OFFER CALC BUTTON ── */
+  .btn-offer {
+    background: transparent;
+    border: 1px solid var(--warn);
+    color: var(--warn);
+    padding: 4px 9px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 10px;
+    font-weight: 600;
+    transition: 0.15s;
+    white-space: nowrap;
+    margin-left: 4px;
+  }
+  .btn-offer:hover { background: rgba(245,158,11,0.15); }
+
+  /* ── OFFER CALC MODAL ── */
+  #offer-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 2000;
+    align-items: center;
+    justify-content: center;
+  }
+  #offer-overlay.open { display: flex; }
+  #offer-modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 480px;
+    padding: 28px;
+    position: relative;
+  }
+  #offer-modal h2 { font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+  #offer-modal .sub { font-size: 11px; color: var(--muted); margin-bottom: 20px; }
+  #offer-close { position: absolute; top: 14px; right: 18px; background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; }
+  #offer-close:hover { color: var(--text); }
+
+  .offer-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+  .offer-input-group { display: flex; flex-direction: column; gap: 4px; }
+  .offer-input-group label { font-size: 10px; color: var(--muted); }
+  .offer-input-group input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    padding: 7px 10px;
+  }
+  .offer-input-group input:focus { outline: none; border-color: var(--accent); }
+
+  .offer-result {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .offer-result-main {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+  .offer-result-main .label { font-size: 11px; color: var(--muted); }
+  .offer-result-main .value { font-size: 22px; font-weight: 700; }
+  .offer-result-main .value.good { color: var(--pass); }
+  .offer-result-main .value.close { color: var(--warn); }
+  .offer-result-main .value.far  { color: var(--fail); }
+
+  .offer-gap {
+    display: flex;
+    justify-content: space-between;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .offer-gap span { font-weight: 600; color: var(--text); }
+
+  .offer-breakdown { font-size: 11px; color: var(--muted); display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 12px; }
+  .offer-breakdown .row { display: flex; justify-content: space-between; }
+  .offer-breakdown .row span { color: var(--text); font-weight: 600; }
+
+  /* ── FILTER BAR ── */
+  .filter-bar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .filter-bar label { font-size: 11px; color: var(--muted); white-space: nowrap; }
+  .filter-bar select, .filter-bar input {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 11px;
+    padding: 5px 8px;
+  }
+  .filter-bar select:focus, .filter-bar input:focus { outline: none; border-color: var(--accent); }
+  .filter-sep { width: 1px; height: 20px; background: var(--border); }
+  .filter-clear {
+    background: none;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 11px;
+    padding: 5px 10px;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: 0.15s;
+  }
+  .filter-clear:hover { border-color: var(--accent); color: var(--accent); }
+  #modal-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 1000;
+    overflow-y: auto;
+  }
+  #modal-overlay.open { display: flex; align-items: flex-start; justify-content: center; padding: 32px 16px; }
+  #modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 700px;
+    padding: 28px;
+    position: relative;
+  }
+  #modal h2 { font-size: 16px; font-weight: 700; margin-bottom: 20px; color: var(--text); }
+  #modal-close {
+    position: absolute; top: 16px; right: 20px;
+    background: none; border: none; color: var(--muted);
+    font-size: 20px; cursor: pointer; line-height: 1;
+  }
+  #modal-close:hover { color: var(--text); }
+
+  .modal-section {
+    margin-bottom: 20px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+  .modal-section:last-child { border-bottom: none; margin-bottom: 0; }
+  .modal-section h3 { font-size: 11px; color: var(--muted); letter-spacing: 0.1em; margin-bottom: 12px; }
+
+  .kv-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .kv-grid .kv { display: flex; flex-direction: column; gap: 2px; }
+  .kv label { font-size: 10px; color: var(--muted); }
+  .kv input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 12px;
+    padding: 6px 9px;
+    transition: 0.15s;
+    width: 100%;
+  }
+  .kv input:focus { outline: none; border-color: var(--accent); }
+
+  .unit-table-wrap { overflow-x: auto; }
+  .unit-table { width: 100%; border-collapse: collapse; font-size: 11px; }
+  .unit-table th {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    padding: 5px 8px;
+    color: var(--muted);
+    font-weight: 500;
+    text-align: left;
+  }
+  .unit-table td {
+    border: 1px solid var(--border);
+    padding: 5px 8px;
+    vertical-align: middle;
+  }
+  .unit-table input {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 11px;
+    padding: 2px 4px;
+    width: 100%;
+    border-radius: 3px;
+  }
+  .unit-table input:focus { outline: none; border-color: var(--accent); background: var(--surface); }
+  .unit-table select {
+    background: transparent;
+    border: 1px solid transparent;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 11px;
+    padding: 2px 4px;
+    width: 100%;
+    border-radius: 3px;
+  }
+  .unit-table select:focus { outline: none; border-color: var(--accent); }
+
+  .rent-status {
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 6px;
+    border-radius: 4px;
+  }
+  .rent-confirmed { background: rgba(16,185,129,0.15); color: var(--pass); }
+  .rent-fmr { background: rgba(245,158,11,0.15); color: var(--warn); }
+  .rent-call { background: rgba(239,68,68,0.15); color: var(--fail); }
+
+  .metrics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .metric-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 10px 12px;
+    text-align: center;
+  }
+  .metric-box .val { font-size: 16px; font-weight: 700; }
+  .metric-box .lbl { font-size: 10px; color: var(--muted); margin-top: 2px; }
+  .metric-pass .val { color: var(--pass); }
+  .metric-fail .val { color: var(--fail); }
+  .metric-warn .val { color: var(--warn); }
+
+  .modal-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+  .btn-primary {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    transition: 0.15s;
+  }
+  .btn-primary:hover { background: #2563eb; }
+  .btn-secondary {
+    background: var(--surface2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    padding: 10px 20px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    transition: 0.15s;
+  }
+  .btn-secondary:hover { border-color: var(--accent); color: var(--accent); }
+
+  .recalc-note { font-size: 11px; color: var(--muted); margin-top: 8px; }
+
+  .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+  /* ── GRADE BADGE ── */
+  .grade-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px; height: 22px;
+    border-radius: 5px;
+    font-size: 11px;
+    font-weight: 800;
+    border: 1px solid;
+    flex-shrink: 0;
+    cursor: default;
+  }
+  .grade-select {
+    background: transparent;
+    border: none;
+    font-family: inherit;
+    font-size: 11px;
+    font-weight: 800;
+    cursor: pointer;
+    padding: 0 2px;
+    appearance: none;
+    -webkit-appearance: none;
+    width: 22px;
+    text-align: center;
+  }
+
+  /* ── ZILLOW LINK ── */
+  .zillow-link {
+    display: inline-block;
+    font-size: 9px;
+    font-weight: 700;
+    color: var(--accent);
+    background: rgba(59,130,246,0.12);
+    border: 1px solid rgba(59,130,246,0.3);
+    border-radius: 3px;
+    padding: 1px 4px;
+    text-decoration: none;
+    margin-left: 5px;
+    vertical-align: middle;
+    transition: 0.15s;
+    letter-spacing: 0.03em;
+  }
+  .zillow-link:hover { background: rgba(59,130,246,0.25); }
+
+  /* ── EXPORT BUTTON ── */
+  .btn-export {
+    background: linear-gradient(135deg, #10b981, #059669);
+    color: white;
+    border: none;
+    padding: 7px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 12px;
+    font-weight: 700;
+    transition: 0.15s;
+    letter-spacing: 0.03em;
+    white-space: nowrap;
+  }
+  .btn-export:hover { background: linear-gradient(135deg, #059669, #047857); }
+
+  /* ── EXPORT MODAL ── */
+  #export-overlay {
+    display: none;
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.75);
+    z-index: 3000;
+    align-items: center;
+    justify-content: center;
+  }
+  #export-overlay.open { display: flex; }
+  #export-modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    width: 100%;
+    max-width: 440px;
+    padding: 28px;
+    position: relative;
+  }
+  #export-modal h2 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+  #export-modal .sub { font-size: 12px; color: var(--muted); margin-bottom: 22px; line-height: 1.5; }
+  #export-close { position: absolute; top: 14px; right: 18px; background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; }
+  #export-close:hover { color: var(--text); }
+  .export-fields { display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px; }
+  .export-field { display: flex; flex-direction: column; gap: 4px; }
+  .export-field label { font-size: 10px; color: var(--muted); letter-spacing: 0.08em; }
+  .export-field input {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text);
+    font-family: inherit;
+    font-size: 13px;
+    padding: 9px 12px;
+    transition: 0.15s;
+  }
+  .export-field input:focus { outline: none; border-color: var(--accent); }
+  .export-preview {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 14px;
+    margin-bottom: 16px;
+    font-size: 11px;
+    color: var(--muted);
+  }
+  .export-preview strong { color: var(--text); }
+
+  /* ── GITHUB LINK MODAL ── */
+  #github-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+  }
+  #github-overlay.open { display: flex; }
+  #github-modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 28px 28px 24px;
+    max-width: 520px;
+    width: 90%;
+    position: relative;
+  }
+  #github-modal h2 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+  #github-modal .sub { font-size: 12px; color: var(--muted); margin-bottom: 20px; line-height: 1.5; }
+  #github-close { position: absolute; top: 14px; right: 18px; background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; }
+  #github-close:hover { color: var(--text); }
+  .github-link-box {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px 14px;
+    font-size: 11px;
+    color: var(--accent);
+    word-break: break-all;
+    margin-bottom: 12px;
+    line-height: 1.6;
+  }
+  .github-steps {
+    font-size: 11px;
+    color: var(--muted);
+    margin-bottom: 20px;
+    line-height: 1.8;
+  }
+  .github-steps span { color: var(--text); }
+  #btn-copy-link {
+    width: 100%;
+    padding: 10px;
+    background: linear-gradient(135deg, var(--accent), #2563eb);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    letter-spacing: 0.04em;
+  }
+  #btn-copy-link:hover { opacity: 0.9; }
+  #btn-copy-link.copied { background: linear-gradient(135deg, var(--accent2), #059669); }
+
+  /* ── SETTINGS ── */
+  .header-right { margin-left: auto; display: flex; align-items: center; gap: 10px; }
+  #btn-settings { background: none; border: 1px solid var(--border); border-radius: 6px; color: var(--muted); font-size: 16px; padding: 4px 8px; cursor: pointer; }
+  #btn-settings:hover { color: var(--text); border-color: var(--accent); }
+  #settings-overlay {
+    display: none; position: fixed; inset: 0;
+    background: rgba(0,0,0,0.7); z-index: 9999;
+    align-items: center; justify-content: center;
+  }
+  #settings-overlay.open { display: flex; }
+  #settings-modal {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 28px; max-width: 480px; width: 90%; position: relative;
+  }
+  #settings-modal h2 { font-size: 15px; font-weight: 700; margin-bottom: 6px; }
+  #settings-modal .sub { font-size: 12px; color: var(--muted); margin-bottom: 20px; line-height: 1.6; }
+  #settings-close { position: absolute; top: 14px; right: 18px; background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; }
+  #settings-close:hover { color: var(--text); }
+  .settings-field { display: flex; flex-direction: column; gap: 4px; margin-bottom: 14px; }
+  .settings-field label { font-size: 10px; color: var(--muted); letter-spacing: 0.08em; }
+  .settings-field input {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 6px; color: var(--text); font-family: inherit;
+    font-size: 12px; padding: 8px 10px;
+  }
+  .settings-field input:focus { outline: none; border-color: var(--accent); }
+  #btn-save-settings {
+    width: 100%; padding: 10px;
+    background: linear-gradient(135deg, var(--accent), #2563eb);
+    color: white; border: none; border-radius: 8px;
+    font-size: 13px; font-weight: 600; cursor: pointer;
+  }
+  #btn-save-settings:hover { opacity: 0.9; }
+  #btn-save-settings.saved { background: linear-gradient(135deg, var(--accent2), #059669); }
+  .settings-status { font-size: 11px; color: var(--accent2); margin-top: 10px; text-align: center; min-height: 16px; }
+
+  /* scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+<style>.btn-export { display: none !important; }</style></head>
+<body>
+
+<header>
+  <h1>MLS UNDERWRITER</h1>
+  <span class="badge">CLIENT DECK · Apr 10, 2026</span>
+  <div class="header-right">
+    
+  </div>
+</header>
+
+
+
+
+
+<div id="status" class="done">✓ Parsed 1 properties from Agent_Full4007.pdf</div>
+<div id="results">
+    <div class="results-header">
+      <h2>📊 1 Properties — 1 Pass Filters</h2>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:12px;color:var(--muted)">Min CF: $300/door/mo · Min Cap: 6.0%</span>
+        <button class="btn-export" onclick="openExportModal()">📤 Export Client Copy</button>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <label>TYPE:</label>
+      <select onchange="filterType=this.value;renderTable()">
+        <option value="all" selected="">All Types</option>
+        <option value="Duplex">Duplex</option>
+        <option value="Triplex">Triplex</option>
+        <option value="Quadruplex">Quadruplex</option>
+      </select>
+      <div class="filter-sep"></div>
+      <label>SHOW:</label>
+      <select onchange="filterStatus=this.value;renderTable()">
+        <option value="all" selected="">All Properties</option>
+        <option value="pass">Passing Only</option>
+        <option value="fail">Failing Only</option>
+      </select>
+      <div class="filter-sep"></div>
+      <label>SHOWING 1 of 1</label>
+      
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>ADDRESS</th>
+          <th>GRADE</th>
+          <th>TYPE</th>
+          <th class="sortable " onclick="setSort('price')">PRICE</th>
+          <th>UNITS</th>
+          <th class="sortable " onclick="setSort('rent')">GROSS RENT/MO</th>
+          <th class="sortable " onclick="setSort('monthlyCF')">MONTHLY CF</th>
+          <th class="sortable " onclick="setSort('cf')">CF/DOOR</th>
+          <th class="sortable " onclick="setSort('capRate')">CAP RATE</th>
+          <th class="sortable " onclick="setSort('coc')">COC</th>
+          <th>1% RULE</th>
+          <th class="sortable " onclick="setSort('dom')">DOM</th>
+          <th>ACTIONS</th>
+        </tr>
+      </thead>
+      <tbody>
+  
+      <tr onclick="openModal(0)">
+        <td class="addr">
+          567 E 128th St
+          <a href="https://www.zillow.com/homes/567-E-128th-St-Cleveland-OH-44108_rb/" target="_blank" onclick="event.stopPropagation()" class="zillow-link" title="View on Zillow">Z↗</a>
+        </td>
+        <td onclick="event.stopPropagation()" style="text-align:center">
+          <div class="grade-badge" style="background:rgba(239,68,68,0.15);color:#ef4444;border-color:#ef4444">
+    <select class="grade-select" style="color:#ef4444" onchange="setGrade(0,this.value)" title="Override neighborhood grade">
+      <option value="A">A</option><option value="B">B</option><option value="C">C</option><option value="D" selected="">D</option>
+    </select>
+  </div>
+        </td>
+        <td><span class="pill pill-blue">Duplex</span></td>
+        <td class="price">$95,000</td>
+        <td style="text-align:center">2</td>
+        <td>$2,760<span title="Some units use FMR or estimated rent" style="color:var(--warn);margin-left:3px;font-size:10px">*</span></td>
+        <td><span class="pill pill-pass">$1,518/mo</span></td>
+        <td><span class="pill pill-pass">$759/mo</span></td>
+        <td><span class="pill pill-pass">25.9%</span></td>
+        <td><span class="pill pill-pass">70.1%</span></td>
+        <td><span class="pill pill-pass">2.9%</span></td>
+        <td style="color:var(--pass)">4d</td>
+        <td onclick="event.stopPropagation()" style="white-space:nowrap">
+          <button class="btn-report" onclick="openModal(0)">View</button>
+          <button class="btn-offer" onclick="openOfferCalc(0)">$ Offer</button>
+        </td>
+      </tr>
+    </tbody></table></div>
+
+<!-- EXPORT CLIENT COPY MODAL -->
+<!-- SETTINGS MODAL -->
+
+
+<!-- GITHUB LINK MODAL -->
+<div id="github-overlay">
+  <div id="github-modal">
+    <button id="github-close">×</button>
+    <h2 id="github-modal-title">📤 Uploading to GitHub...</h2>
+    <div class="sub" id="github-modal-sub">Please wait while your deck is uploaded.</div>
+    <div class="github-link-box" id="github-link-display" style="display:none"></div>
+    <div class="github-steps" id="github-steps" style="display:none">
+      <span>Next steps:</span><br>
+      1. Go to your <span>Client-Decks</span> repository on GitHub<br>
+      2. Click <span>Add file → Upload files</span><br>
+      3. Upload the file you just downloaded<br>
+      4. Click <span>Commit changes</span><br>
+      5. Send the link above to your client
+    </div>
+    <button id="btn-copy-link" onclick="copyGithubLink()" style="display:none">📋 Copy Link</button>
+  </div>
+</div>
+
+
+
+<!-- OFFER CALC MODAL -->
+<div id="offer-overlay">
+  <div id="offer-modal">
+    <button id="offer-close">×</button>
+    <h2 id="offer-title"></h2>
+    <div class="sub" id="offer-sub"></div>
+
+    <div class="offer-inputs">
+      <div class="offer-input-group">
+        <label>TARGET CF / DOOR / MO ($)</label>
+        <input type="number" id="oc-cf" value="300" oninput="recalcOffer()">
+      </div>
+      <div class="offer-input-group">
+        <label>TARGET CAP RATE (%)</label>
+        <input type="number" id="oc-cap" value="6.0" step="0.1" oninput="recalcOffer()">
+      </div>
+      <div class="offer-input-group">
+        <label>TARGET COC RETURN (%)</label>
+        <input type="number" id="oc-coc" value="8.0" step="0.1" oninput="recalcOffer()">
+      </div>
+      <div class="offer-input-group">
+        <label>RATE (%) · FIXED</label>
+        <input type="number" id="oc-rate" value="7.5" step="0.125" oninput="recalcOffer()">
+      </div>
+    </div>
+
+    <div class="offer-result" id="offer-result"></div>
+
+    <div style="font-size:11px;color:var(--muted)">
+      Max offer is the <em>lowest</em> price that satisfies all three targets simultaneously.
+      Adjust targets to model different scenarios.
+    </div>
+  </div>
+</div>
+
+<!-- MODAL -->
+
+<div id="modal-overlay">
+  <div id="modal">
+    <button id="modal-close">×</button>
+    <h2 id="modal-title"></h2>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════════════
+// HUD FY2026 SAFMR — Cleveland, OH HUD Metro FMR Area
+// Source: huduser.gov FY2026 SAFMR Final (verified from official PDF 3/31/26)
+// Covers: Cuyahoga, Lorain, Lake, Geauga, Medina counties
+// Format: [Efficiency, 1BR, 2BR, 3BR, 4BR]
+// ═══════════════════════════════════════════════════════
+const FMR = {
+  // ── Cuyahoga County ──
+  "44101":[1170,1330,1610,2080,2220], "44102":[820,940,1130,1450,1550],
+  "44103":[780,890,1070,1380,1470],   "44104":[720,810,980,1260,1350],
+  "44105":[780,890,1070,1380,1470],   "44106":[1060,1200,1450,1870,2000],
+  "44107":[990,1130,1360,1750,1870],  "44108":[850,960,1160,1490,1600],
+  "44109":[790,890,1080,1390,1490],   "44110":[800,910,1100,1420,1510],
+  "44111":[860,980,1180,1520,1620],   "44112":[790,890,1080,1390,1490],
+  "44113":[1400,1590,1920,2470,2640], "44114":[1300,1470,1780,2290,2450],
+  "44115":[1120,1270,1540,1980,2120], "44116":[1030,1170,1410,1810,1940],
+  "44117":[790,890,1080,1390,1490],   "44118":[1090,1230,1490,1920,2050],
+  "44119":[860,980,1180,1520,1620],   "44120":[880,1000,1210,1560,1660],
+  "44121":[1040,1180,1420,1830,1950], "44122":[1340,1520,1840,2370,2530],
+  "44123":[930,1060,1280,1650,1760],  "44124":[1080,1220,1480,1900,2040],
+  "44125":[1010,1150,1390,1790,1910], "44126":[880,1000,1210,1560,1660],
+  "44127":[710,810,970,1250,1340],    "44128":[910,1030,1250,1610,1720],
+  "44129":[910,1030,1250,1610,1720],  "44130":[1010,1140,1380,1780,1900],
+  "44131":[1340,1520,1840,2370,2530], "44132":[930,1050,1270,1630,1750],
+  "44133":[960,1090,1320,1700,1820],  "44134":[1030,1170,1410,1810,1940],
+  "44135":[930,1060,1280,1650,1760],  "44136":[1090,1240,1500,1930,2060],
+  "44137":[1170,1330,1610,2070,2220], "44138":[1090,1240,1500,1930,2060],
+  "44139":[1300,1470,1780,2290,2450], "44140":[1280,1450,1750,2250,2410],
+  "44141":[1280,1450,1760,2260,2420], "44142":[990,1120,1350,1740,1860],
+  "44143":[880,990,1200,1540,1650],   "44144":[840,950,1150,1480,1580],
+  "44145":[1280,1460,1760,2260,2420], "44146":[900,1030,1240,1600,1710],
+  "44147":[990,1120,1350,1740,1860],  "44149":[1150,1300,1570,2020,2160],
+  "44181":[930,1060,1280,1650,1760],  "44199":[930,1060,1280,1650,1760],
+  // ── Lorain County ──
+  "44001":[870,980,1190,1530,1640],   "44011":[1300,1470,1780,2290,2450],
+  "44012":[1360,1540,1860,2390,2560], "44028":[1380,1560,1890,2430,2600],
+  "44035":[840,950,1150,1480,1580],   "44036":[870,980,1190,1530,1640],
+  "44039":[960,1090,1320,1700,1820],  "44044":[920,1040,1260,1620,1730],
+  "44049":[800,900,1090,1400,1500],   "44050":[1000,1130,1370,1760,1880],
+  "44052":[830,940,1140,1470,1570],   "44053":[790,890,1080,1390,1490],
+  "44054":[990,1130,1360,1750,1870],  "44055":[820,940,1130,1450,1550],
+  "44074":[860,980,1180,1520,1620],   "44089":[1020,1090,1350,1710,1880],
+  "44090":[740,840,1010,1300,1390],
+  // ── Lake County ──
+  "44057":[970,1100,1330,1710,1830],  "44060":[1050,1190,1440,1850,1980],
+  "44077":[900,1020,1230,1580,1690],  "44092":[960,1090,1320,1700,1820],
+  "44094":[1080,1220,1480,1900,2040], "44095":[910,1030,1250,1610,1720],
+  "44096":[980,1110,1340,1720,1840],  "44099":[800,910,1110,1400,1530],
+  // ── Geauga County ──
+  "44021":[870,980,1190,1530,1640],   "44022":[1350,1530,1850,2380,2550],
+  "44023":[1400,1590,1920,2470,2640], "44024":[990,1120,1350,1740,1860],
+  "44026":[1140,1290,1560,2000,2140], "44033":[910,1030,1250,1610,1720],
+  "44040":[1400,1590,1920,2470,2640], "44041":[710,830,1030,1250,1420],
+  "44045":[830,940,1140,1470,1570],   "44046":[840,950,1150,1480,1580],
+  "44061":[980,1110,1340,1720,1840],  "44062":[770,860,1050,1350,1450],
+  "44064":[990,1120,1350,1740,1860],  "44065":[800,900,1090,1400,1500],
+  "44072":[1360,1550,1870,2410,2570], "44080":[800,870,1090,1380,1480],
+  "44081":[800,910,1100,1420,1510],   "44086":[900,1020,1230,1580,1690],
+  // ── Medina County ──
+  "44017":[930,1060,1280,1650,1760],  "44070":[990,1120,1350,1740,1860],
+  "44202":[1360,1480,1900,2320,2520], "44203":[810,880,1130,1380,1500],
+  "44212":[1050,1190,1440,1850,1980], "44214":[770,880,1120,1370,1590],
+  "44215":[990,1120,1350,1740,1860],  "44217":[710,810,1020,1250,1460],
+  "44230":[700,800,1010,1240,1450],   "44231":[780,850,1090,1340,1450],
+  "44233":[850,970,1170,1510,1610],   "44234":[820,900,1140,1410,1530],
+  "44235":[820,930,1150,1460,1620],   "44251":[1400,1590,1920,2470,2640],
+  "44253":[930,1050,1270,1630,1740],  "44254":[800,900,1090,1400,1500],
+  "44256":[1040,1180,1420,1830,1950], "44258":[1000,1130,1370,1760,1880],
+  "44270":[690,780,990,1220,1420],    "44273":[850,970,1170,1500,1610],
+  "44274":[930,1060,1280,1650,1760],  "44275":[1000,1130,1370,1760,1880],
+  "44280":[1400,1590,1920,2470,2640], "44281":[930,1060,1280,1650,1760],
+  "44282":[1000,1130,1370,1760,1880], "44287":[700,800,1010,1270,1480],
+  // ── Other ZIPs in Cleveland Metro FMR Area ──
+  "44321":[1210,1320,1700,2070,2250], "44333":[940,1030,1320,1610,1750],
+  "44491":[770,820,1030,1340,1420],   "44851":[730,750,970,1220,1500],
+  "44859":[710,770,980,1270,1510],    "44880":[770,860,1070,1370,1560],
+  "44889":[870,900,1150,1440,1730],
+  // ── Akron, OH MSA (Summit, Portage, Stark counties) ──
+  // Summit County — Akron core
+  "44301":[920,1000,1290,1570,1710],  "44302":[710,770,990,1210,1310],
+  "44303":[800,870,1120,1370,1480],   "44304":[860,930,1200,1460,1590],
+  "44305":[910,990,1270,1550,1680],   "44306":[840,920,1180,1440,1560],
+  "44307":[800,870,1120,1370,1480],   "44308":[800,870,1120,1360,1480],
+  "44309":[900,980,1260,1540,1670],   "44310":[830,910,1170,1430,1550],
+  "44311":[760,830,1070,1310,1420],   "44312":[890,970,1250,1530,1660],
+  "44313":[920,1000,1290,1570,1710],  "44314":[810,890,1140,1390,1510],
+  "44316":[900,980,1260,1540,1670],   "44319":[960,1040,1340,1640,1780],
+  "44320":[820,890,1150,1400,1520],   "44325":[830,900,1160,1420,1540],
+  "44334":[900,980,1260,1540,1670],
+  // Summit County — suburbs
+  "44056":[1360,1480,1900,2320,2520], "44067":[1110,1200,1550,1890,2050],
+  "44087":[1140,1240,1600,1950,2120], "44210":[900,980,1260,1540,1670],
+  "44211":[930,1010,1300,1590,1720],  "44216":[770,850,1090,1330,1440],
+  "44221":[980,1070,1380,1680,1830],  "44222":[900,980,1260,1540,1670],
+  "44223":[930,1020,1310,1600,1740],  "44224":[1070,1170,1500,1830,1990],
+  "44232":[900,980,1260,1540,1670],   "44236":[1360,1480,1900,2320,2520],
+  "44240":[910,990,1280,1560,1700],   "44241":[1160,1270,1630,1990,2160],
+  "44242":[930,1010,1300,1590,1720],  "44243":[910,990,1280,1560,1700],
+  "44250":[860,930,1200,1460,1590],   "44255":[900,980,1260,1540,1670],
+  "44260":[880,960,1240,1510,1640],   "44262":[730,790,1020,1240,1350],
+  "44264":[1020,1110,1430,1740,1900], "44265":[930,1010,1300,1590,1720],
+  "44266":[860,930,1200,1460,1590],   "44272":[910,990,1270,1550,1680],
+  "44278":[910,990,1280,1560,1700],   "44285":[860,930,1200,1460,1590],
+  "44286":[1050,1140,1470,1790,1950], "44288":[910,990,1270,1550,1680],
+  // Portage County
+  "44201":[940,1030,1320,1610,1750],
+  // Stark County
+  "44411":[980,1070,1380,1680,1830],  "44412":[740,800,1020,1260,1370],
+  "44429":[790,820,1040,1360,1440],   "44444":[730,770,970,1260,1340],
+  "44449":[720,760,970,1230,1320],    "44470":[730,770,970,1270,1340],
+  "44601":[700,790,1010,1280,1350],   "44614":[810,910,1170,1480,1560],
+  "44632":[830,930,1200,1510,1600],   "44645":[900,1020,1300,1590,1860],
+  "44685":[1070,1190,1530,1890,2030], "44720":[840,940,1210,1520,1620],
+};
+
+// ═══════════════════════════════════════════════════════
+// NEIGHBORHOOD GRADES — Cuyahoga County ZIP defaults
+// A = Strong/stable, B = Good rental, C = Moderate/transitional, D = Distressed
+// ⚠ ZIP-level estimate only — conditions vary street to street
+// ═══════════════════════════════════════════════════════
+const ZIP_GRADES = {
+  // Cleveland core east side
+  "44103": "D", "44104": "D", "44105": "D", "44106": "C",
+  "44108": "D", "44112": "D", "44114": "D", "44115": "C",
+  // Cleveland west side
+  "44102": "C", "44109": "C", "44111": "C", "44113": "C",
+  "44107": "C", "44144": "C",
+  // Cleveland far east
+  "44110": "C", "44117": "C", "44119": "C", "44123": "C",
+  // Cleveland south / inner ring
+  "44127": "D", "44128": "C", "44125": "C", "44134": "C",
+  // Inner-ring suburbs — stronger
+  "44118": "B", "44120": "C", "44121": "B", "44122": "B",
+  "44131": "C", "44137": "C",
+  // West suburbs
+  "44126": "B", "44129": "B", "44130": "B", "44135": "C",
+  "44138": "B", "44142": "C",
+  // East suburbs
+  "44132": "B", "44143": "B", "44146": "B",
+  // Strong suburbs
+  "44116": "B", "44124": "A", "44139": "A", "44140": "B",
+  "44141": "A", "44145": "B",
+  // ── Lorain County ──
+  // Avon / Avon Lake — top-tier west suburbs
+  "44011": "A", "44012": "A",
+  // Columbia Station / North Ridgeville / Sheffield Lake
+  "44028": "B", "44039": "B", "44054": "B",
+  // Amherst / LaGrange / Grafton / Vermilion / Oberlin
+  "44001": "C", "44050": "B", "44044": "C", "44089": "C", "44074": "C",
+  // Elyria
+  "44035": "C", "44036": "C",
+  // Lorain city — distressed
+  "44052": "D", "44053": "D", "44055": "D",
+  // Wellington / Kipton — rural/small town
+  "44090": "C", "44049": "C",
+  // ── Akron MSA ──
+  // Hudson, Macedonia, Twinsburg, Aurora — top-tier
+  "44236": "A", "44056": "A", "44087": "B", "44202": "A",
+  // Stow, Fairlawn, Copley, Green, Uniontown, North Canton
+  "44224": "B", "44333": "B", "44321": "B", "44232": "B",
+  "44685": "B", "44720": "B", "44264": "B", "44286": "B",
+  // Cuyahoga Falls, Streetsboro, Tallmadge, Northfield
+  "44221": "B", "44222": "B", "44223": "B", "44241": "B",
+  "44067": "B", "44278": "B",
+  // Kent, Ravenna, Mogadore, Mantua, Rootstown
+  "44240": "C", "44242": "C", "44243": "C", "44266": "C",
+  "44255": "C", "44260": "C", "44272": "C", "44265": "C",
+  "44288": "C", "44285": "C",
+  // Barberton, Norton, Lakemore, Springfield
+  "44203": "C", "44216": "C", "44250": "C", "44312": "C",
+  "44210": "C", "44211": "C", "44262": "C",
+  // Akron core — distressed
+  "44301": "D", "44302": "D", "44303": "D", "44304": "D",
+  "44305": "C", "44306": "D", "44307": "D", "44308": "D",
+  "44309": "D", "44310": "C", "44311": "D", "44313": "C",
+  "44314": "C", "44316": "D", "44319": "C", "44320": "C",
+  // Stark / Portage rural
+  "44201": "C", "44411": "C", "44412": "C", "44429": "C",
+  "44444": "C", "44449": "C", "44470": "C", "44601": "C",
+  "44614": "C", "44632": "C", "44645": "C",
+};
+
+function getZipGrade(zip) {
+  return ZIP_GRADES[zip] || 'C'; // default C if ZIP not in table
+}
+
+const GRADE_COLORS = {
+  'A': { bg: 'rgba(16,185,129,0.15)',  text: '#10b981', border: '#10b981' },
+  'B': { bg: 'rgba(59,130,246,0.15)',  text: '#3b82f6', border: '#3b82f6' },
+  'C': { bg: 'rgba(245,158,11,0.15)',  text: '#f59e0b', border: '#f59e0b' },
+  'D': { bg: 'rgba(239,68,68,0.15)',   text: '#ef4444', border: '#ef4444' },
+};
+
+function gradeDisclosure() {
+  return '<em style="font-size:10px;color:var(--muted)">⚠ ZIP-level estimate only — grade varies street to street. Verify locally.</em>';
+}
+
+function getFMR(zip, beds) {
+  const rates = FMR[zip];
+  if (!rates) return null;
+  const idx = Math.min(Math.max(beds, 0), 4);
+  return rates[idx];
+}
+
+// ═══════════════════════════════════════════════════════
+// WORKSHEET CONSTANTS
+// ═══════════════════════════════════════════════════════
+const WS = {
+  downPct: 0.20,
+  rate: 0.075,
+  term: 30,
+  closingCost: 7000,
+  vacancyPct: 0.05,
+  insurance: 1500,
+  mgmtPct: 0.08,
+  capexPct: 0.05,
+  repairsAnnual: 0,
+  rentGrowth: 0.03,
+  appreciation: 0.03,
+  taxBracket: 0.25,
+  landValue: 14000,
+  personalPropDep: 1000,
+  personalPropDepPct: 0.20,
+  minCF: 300,
+  minCapRate: 0.06,
+};
+
+// ═══════════════════════════════════════════════════════
+// MORTGAGE CALC
+// ═══════════════════════════════════════════════════════
+function calcMortgage(price) {
+  const loan = price * (1 - WS.downPct);
+  const r = WS.rate / 12;
+  const n = WS.term * 12;
+  const pmt = loan * r * Math.pow(1+r,n) / (Math.pow(1+r,n)-1);
+  return { loan, pmt, annual: pmt * 12 };
+}
+
+// ═══════════════════════════════════════════════════════
+// DEPRECIATION
+// ═══════════════════════════════════════════════════════
+function calcDepreciation(price, yr) {
+  // Building dep: full purchase price * 3.636% declining
+  const buildingDep = price * 0.03636;
+  // Personal property dep: $1000 * 20% yr1 declining (200DB)
+  const ppDep = WS.personalPropDep * WS.personalPropDepPct * Math.pow(0.8, yr-1);
+  return buildingDep + ppDep;
+}
+
+// ═══════════════════════════════════════════════════════
+// FULL ANALYSIS  (yr 1..5)
+// ═══════════════════════════════════════════════════════
+function analyze(prop) {
+  const price = prop.listPrice;
+  const doors = prop.units.length;
+  const m = calcMortgage(price);
+
+  const years = [];
+  for (let yr = 1; yr <= 5; yr++) {
+    const rent = prop.units.reduce((s,u) => s + u.effectiveRent, 0);
+    const gi = rent * 12 * Math.pow(1+WS.rentGrowth, yr-1);
+    const vacancy = gi * WS.vacancyPct;
+    const egi = gi - vacancy;
+    const mgmt = egi * WS.mgmtPct;
+    const capex = egi * WS.capexPct;
+    const repairs = WS.repairsAnnual;
+    const opex = WS.insurance + mgmt + capex + repairs + prop.annualTax;
+    const noi = egi - opex;
+    const debtService = m.annual;
+    const annualCF = noi - debtService;
+    const cfPerDoor = annualCF / doors;
+    const monthlyCF = annualCF / 12;
+
+    // Principal reduction yr1 approximation
+    const r = WS.rate / 12;
+    const n = WS.term * 12;
+    let prinReduction = 0;
+    for (let mo = 1; mo <= 12; mo++) {
+      const moNum = (yr-1)*12 + mo;
+      const interest = m.loan * r * Math.pow(1+r, moNum-1) * (Math.pow(1+r,n-moNum+1)-1) / (Math.pow(1+r,n)-1);
+      // simpler: interest = remaining_balance * r
+      prinReduction += m.pmt - (m.loan * Math.pow(1+r, (yr-1)*12) * (1 - Math.pow(1+r, -(n-(yr-1)*12))) / (n-(yr-1)*12) ) * r;
+    }
+    // Use standard amortization for principal
+    let bal = m.loan;
+    let totalPrin = 0;
+    for (let mo = 1; mo <= (yr)*12; mo++) {
+      const int = bal * r;
+      const prin = m.pmt - int;
+      if (mo > (yr-1)*12) totalPrin += prin;
+      bal -= prin;
+    }
+    prinReduction = totalPrin;
+
+    const dep = calcDepreciation(price, yr);
+    const taxableIncome = noi - dep - (m.pmt * 12 - prinReduction);
+    const taxSaved = taxableIncome < 0 ? Math.abs(taxableIncome) * WS.taxBracket : 0;
+    const taxPaid = taxableIncome > 0 ? taxableIncome * WS.taxBracket : 0;
+
+    const appreciation = price * (Math.pow(1+WS.appreciation, yr) - Math.pow(1+WS.appreciation, yr-1));
+    const downPayment = price * WS.downPct + WS.closingCost;
+
+    const capRate = noi / price;
+    const coc = annualCF / downPayment;
+    const roiWithApp = (annualCF + prinReduction + appreciation + taxSaved - taxPaid) / downPayment;
+    const roiWithout = (annualCF + prinReduction + taxSaved - taxPaid) / downPayment;
+
+    years.push({ yr, gi, egi, opex, noi, debtService, annualCF, cfPerDoor, monthlyCF,
+                 prinReduction, dep, taxSaved, taxPaid, appreciation,
+                 capRate, coc, roiWithApp, roiWithout, downPayment });
+  }
+
+  // 1% rule
+  const monthlyRent = prop.units.reduce((s,u) => s + u.effectiveRent, 0);
+  const onePercent = monthlyRent / price;
+
+  return { years, onePercent, downPayment: years[0].downPayment, loan: m.loan, monthly: m.pmt };
+}
+
+// ═══════════════════════════════════════════════════════
+// PDF PARSER
+// ═══════════════════════════════════════════════════════
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+async function parsePDF(file) {
+  setStatus('Extracting text from PDF...', 'parsing');
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data: buf}).promise;
+  const numPages = pdf.numPages;
+
+  // Extract each page as its own string, preserving newlines from y-position changes
+  const pages = [];
+  for (let i = 1; i <= numPages; i++) {
+    setStatus(`Reading page ${i} of ${numPages}...`, 'parsing');
+    const page = await pdf.getPage(i);
+    const tc = await page.getTextContent();
+
+    // Sort items by y (descending = top to bottom), then x within same y
+    const items = tc.items.slice().sort((a,b) => {
+      const dy = b.transform[5] - a.transform[5];
+      if (Math.abs(dy) > 3) return dy;
+      return a.transform[4] - b.transform[4];
+    });
+
+    // Group into lines by y-position
+    let lines = [];
+    let curLine = [];
+    let lastY = null;
+    for (const it of items) {
+      const y = Math.round(it.transform[5]);
+      if (lastY !== null && Math.abs(y - lastY) > 4) {
+        if (curLine.length) lines.push(curLine.join(' '));
+        curLine = [];
+      }
+      if (it.str.trim()) curLine.push(it.str.trim());
+      lastY = y;
+    }
+    if (curLine.length) lines.push(curLine.join(' '));
+
+    pages.push(lines.join('\n'));
+  }
+
+  // ── Adaptive page parser ──
+  // Properties are usually 2 pages but sometimes only 1 page.
+  // Fixed stepping breaks all subsequent properties when a 1-pager appears.
+  // Instead: try each page solo first; only consume 2 pages if needed.
+  //
+  // Footer/remarks pages (contain "Prepared By:" but no "List Price:") must be
+  // skipped entirely — their footer line contains the prior property's address
+  // and would confuse the parser if combined with the next listing page.
+  const props = [];
+
+  function isFooterPage(text) {
+    return /Prepared By:/i.test(text) && !/Sub\s*Type:/i.test(text);
+  }
+
+  console.log(`[Tool2] Total pages: ${pages.length}`);
+  console.log('[Tool2] Page 1 preview:\n', pages[0]?.substring(0,500));
+  console.log('[Tool2] Page 2 preview:\n', pages[1]?.substring(0,300));
+
+  let i = 0;
+  while (i < pages.length) {
+    try {
+      // Skip broker remarks / footer pages immediately
+      // Footer pages always have "Prepared By:" but never have "Sub Type:"
+      // (every real listing page has Sub Type: Duplex/Triplex/etc.)
+      if (isFooterPage(pages[i])) {
+        console.log(`[Tool2] Page ${i+1}: footer/remarks page, skipping`);
+        i++;
+        continue;
+      }
+
+      // First: try current page alone
+      const solo = parseOneProperty(pages[i]);
+      if (solo) {
+        props.push(solo);
+        console.log(`[Tool2] Page ${i+1}: parsed solo (1-page property)`);
+        i++;
+        continue;
+      }
+
+      // Solo failed — try combining with next page (skip over any footer in between)
+      let nextIdx = i + 1;
+      while (nextIdx < pages.length && isFooterPage(pages[nextIdx])) nextIdx++;
+
+      if (nextIdx < pages.length) {
+        const combined = pages[i] + '\n' + pages[nextIdx];
+        const pair = parseOneProperty(combined);
+        if (pair) {
+          props.push(pair);
+          console.log(`[Tool2] Pages ${i+1}-${nextIdx+1}: parsed as pair (2-page property)`);
+          i = nextIdx + 1;
+          continue;
+        }
+      }
+
+      // Neither worked — skip this page and move on
+      console.warn(`[Tool2] Page ${i+1}: could not parse, skipping`);
+      i++;
+
+    } catch(e) {
+      console.warn(`[Tool2] Parse error at page ${i+1}:`, e);
+      i++;
+    }
+  }
+
+  return props;
+}
+
+function parseOneProperty(block) {
+  // ── Address ──
+  const addrMatch = block.match(/([^,\n]{5,60},\s*(?:Cleveland|Garfield Heights|Lakewood|Parma|Euclid|East Cleveland|Cleveland Heights|Shaker Heights|South Euclid|Lyndhurst|Lorain|Elyria|Avon Lake|Avon|North Ridgeville|Amherst|Sheffield Lake|Sheffield Village|Oberlin|Wellington|Grafton|LaGrange|Vermilion|Columbia Station|Westlake|Rocky River|Strongsville|North Olmsted|Olmsted Falls|Berea|Middleburg Heights|Brook Park|Akron|Cuyahoga Falls|Stow|Hudson|Barberton|Kent|Ravenna|Tallmadge|Norton|Green|Uniontown|North Canton|Fairlawn|Copley|Macedonia|Northfield|Twinsburg|Aurora|Streetsboro|Mogadore|Munroe Falls|Peninsula|Lakemore|Springfield|Hartville|Canal Fulton|Massillon|Alliance|Louisville|Minerva|Medina|Brunswick)[^,\n]*,\s*OH\s+(\d{5}))/i);
+  if (!addrMatch) return null;
+  const address = addrMatch[1].trim().replace(/\s+/g, ' ');
+  // Reject footer reference lines like "MLS: 5192717 9701 Parkview Ave , Cleveland..."
+  if (/^MLS:/i.test(address)) return null;
+  const zip = addrMatch[2];
+
+  // ── MLS# ──
+  const mlsMatch = block.match(/MLS#?:?\s*(\d{6,8})/i);
+  const mlsNum = mlsMatch ? mlsMatch[1] : '';
+
+  // ── Sub Type ──
+  const subTypeMatch = block.match(/Sub\s*Type:?\s*(Duplex|Triplex|Quadruplex|Two\s*Family|Three\s*Family|Four\s*Family)/i);
+  const subType = subTypeMatch ? subTypeMatch[1] : 'Duplex';
+
+  // ── List Price ──
+  const priceMatch = block.match(/List\s*Price:?\s*\$?([\d,]+)/i);
+  const listPrice = priceMatch ? parseInt(priceMatch[1].replace(/,/g,'')) : 0;
+  if (!listPrice) return null;
+
+  // ── DOM ──
+  const domMatch = block.match(/DOM\/CDOM:?\s*(\d+)\/\d+/i);
+  const dom = domMatch ? parseInt(domMatch[1]) : 0;
+
+  // ── Year Built ──
+  const yrMatch = block.match(/Yr\s*Built:?\s*(\d{4})/i);
+  const yrBuilt = yrMatch ? parseInt(yrMatch[1]) : 0;
+
+  // ── Taxes ──
+  const taxMatch = block.match(/Taxes:?\s*\$?([\d,]+)/i);
+  const annualTax = taxMatch ? parseInt(taxMatch[1].replace(/,/g,'')) : 2000;
+  const taxYearMatch = block.match(/Tax\s*Year:?\s*(\d{4})/i);
+  const taxYear = taxYearMatch ? taxYearMatch[1] : '2024';
+
+  // ── Parcel ID ──
+  const parcelMatch = block.match(/Parcel\s*ID:?\s*([\w\-]+)/i);
+  const parcelId = parcelMatch ? parcelMatch[1] : '';
+
+  // ── Units Table ──
+  const units = parseUnits(block, zip);
+  if (units.length === 0) return null;
+
+  // ── Status ──
+  const statusMatch = block.match(/Status:\s*(\w+)/i);
+  const status = statusMatch ? statusMatch[1] : 'Active';
+
+  return { address, zip, mlsNum, subType, listPrice, dom, yrBuilt, annualTax, taxYear, parcelId, units, status, grade: getZipGrade(zip) };
+}
+
+function parseUnits(block, zip) {
+  const units = [];
+
+  // Matrix unit table format (from confirmed samples):
+  // "2 Bedroom  2  1  $1,000  1,105  Yes  03/01/27"
+  // "3 Bedroom  3  2  1,615  No"
+  // "2 Bedroom  5  2  1  $1,007  1,041  Yes"
+  // "4 Bedroom Or More  4  1  No"
+  // "Apartments  3  1  1  $500  No  Tenant just moved out"
+  //
+  // Columns: [count?] Type  [#Rms]  Beds  Baths  [Rent]  [SqFt]  Occp  [LseExp]  [Desc]
+  // Key: Beds is always a small integer (1-5), Baths is 1 or 2
+  // Occp is always "Yes" or "No"
+
+  // Strategy: find lines containing "Yes" or "No" as occupancy signal,
+  // preceded by bedroom type info, within the unit table section only.
+
+  // Isolate the unit table: between "# Units Type" header and "Features" section
+  const tableStartIdx = block.indexOf('# Units Type');
+  const featuresIdx = block.indexOf('Features');
+  if (tableStartIdx === -1) return parseUnitsAlternate(block, zip);
+
+  const tableEnd = featuresIdx > tableStartIdx ? featuresIdx : tableStartIdx + 1200;
+  const tableText = block.substring(tableStartIdx + 12, tableEnd);
+
+  // Split into lines and process each
+  const lines = tableText.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+
+  for (const line of lines) {
+    // Must contain Yes or No (occupancy)
+    if (!/\b(Yes|No)\b/i.test(line)) continue;
+
+    // Must contain a bedroom type keyword
+    if (!/bedroom|studio|efficiency|apartment/i.test(line)) continue;
+
+    // Skip the header row
+    if (/# Units|Type|# Rms|Beds|Baths|Rent|SqFt|Occp/i.test(line) && line.length < 60) continue;
+
+    const unit = parseUnitLine(line, zip);
+    if (unit) units.push(unit);
+  }
+
+  if (units.length === 0) return parseUnitsAlternate(block, zip);
+  return units;
+}
+
+function parseUnitLine(line, zip) {
+  // Remove leading count number if present (e.g. "2 Bedroom" vs just "Bedroom")
+  // Tokens approach: split on whitespace and parse positionally
+
+  // Extract occupancy first
+  const occMatch = line.match(/\b(Yes|No)\b/i);
+  if (!occMatch) return null;
+  const occupied = occMatch[1].toLowerCase() === 'yes';
+
+  // Extract bedroom count (type)
+  const typeMatch = line.match(/(\d+)\s+(Bedroom(?:\s+Or\s+More)?|BR)/i) ||
+                    line.match(/(Studio|Efficiency|Apartment)/i);
+  let beds = 1;
+  let type = '1 Bedroom';
+  if (typeMatch) {
+    if (/studio|efficiency/i.test(typeMatch[0])) {
+      beds = 0; type = 'Studio';
+    } else if (/apartment/i.test(typeMatch[0])) {
+      // For Apartments type, look for beds in the numbers
+      const bedsMatch = line.match(/Apartments\s+\d+\s+(\d+)\s+\d/i);
+      beds = bedsMatch ? parseInt(bedsMatch[1]) : 1;
+      type = `${beds} Bedroom`;
+    } else {
+      beds = parseInt(typeMatch[1]);
+      type = `${beds} Bedroom`;
+    }
+  }
+
+  // Extract rent: look for $X,XXX or $XXX pattern
+  const rentMatch = line.match(/\$\s*([\d,]+)/);
+  const listedRent = rentMatch ? parseInt(rentMatch[1].replace(/,/g,'')) : 0;
+
+  // Extract sqft: a 3-4 digit number after rent (or after baths) that isn't a year/price
+  // SqFt is typically 800-2000 range
+  const nums = [...line.matchAll(/\b(\d{3,4})\b/g)].map(m => parseInt(m[1]));
+  const sqftCandidates = nums.filter(n => n >= 400 && n <= 2500 && n !== listedRent);
+  const sqft = sqftCandidates.length > 0 ? sqftCandidates[0] : 0;
+
+  // Apply rent logic
+  let effectiveRent, rentSource, rentFlag;
+  if (occupied && listedRent > 200) {
+    effectiveRent = listedRent;
+    rentSource = 'confirmed';
+    rentFlag = '✅';
+  } else if (occupied && listedRent === 0) {
+    const fmr = getFMR(zip, beds) || (beds * 400 + 400);
+    effectiveRent = fmr;
+    rentSource = 'call';
+    rentFlag = '📞';
+  } else {
+    const fmr = getFMR(zip, beds) || (beds * 400 + 400);
+    effectiveRent = fmr;
+    rentSource = 'fmr';
+    rentFlag = '🏛️';
+  }
+
+  return { type, beds, baths: 1, sqft, listedRent, effectiveRent, rentSource, rentFlag, occupied };
+}
+
+function parseUnitsAlternate(block, zip) {
+  // Fallback: look for bedroom mentions and rent figures
+  const units = [];
+
+  // Look for lines like "2 Bedroom ... $950 ... Yes"
+  const rx = /(\d+)\s+Bedroom[^\n]*?(\$[\d,]+)[^\n]*(Yes|No)/gi;
+  let match;
+  while ((match = rx.exec(block)) !== null) {
+    const beds = parseInt(match[1]);
+    const listedRent = parseInt(match[2].replace(/[$,]/g,''));
+    const occupied = match[3].toLowerCase() === 'yes';
+    const fmr = getFMR(zip, beds);
+    let effectiveRent = listedRent || fmr || (beds * 400 + 400);
+    let rentSource = listedRent && occupied ? 'confirmed' : (occupied ? 'call' : 'fmr');
+    let rentFlag = listedRent && occupied ? '✅' : (occupied ? '📞' : '🏛️');
+    units.push({ type: `${beds} Bedroom`, beds, baths: 1, sqft: 0,
+                 listedRent, effectiveRent, rentSource, rentFlag, occupied });
+  }
+
+  return units;
+}
+
+// ═══════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════
+let properties = [];
+let currentProp = null;
+
+// ═══════════════════════════════════════════════════════
+// UI HELPERS
+// ═══════════════════════════════════════════════════════
+function setStatus(msg, type='') {
+  const el = document.getElementById('status');
+  el.textContent = msg;
+  el.className = type;
+}
+
+function fmt$(n) { return '$' + Math.round(n).toLocaleString(); }
+function fmtPct(n) { return (n*100).toFixed(1) + '%'; }
+
+function getPillClass(pass, warn=null) {
+  if (warn !== null) return warn ? 'pill-warn' : (pass ? 'pill-pass' : 'pill-fail');
+  return pass ? 'pill-pass' : 'pill-fail';
+}
+
+// ═══════════════════════════════════════════════════════
+// ZILLOW LINK GENERATOR
+// ═══════════════════════════════════════════════════════
+function zillowURL(address) {
+  // Format: zillow.com/homes/123-Main-St-Cleveland-OH-44102_rb/
+  const slug = address
+    .replace(/,/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/[^a-zA-Z0-9\-]/g, '');
+  return `https://www.zillow.com/homes/${slug}_rb/`;
+}
+
+// ═══════════════════════════════════════════════════════
+// GRADE HELPERS
+// ═══════════════════════════════════════════════════════
+function gradeCell(idx, grade) {
+  const gc = GRADE_COLORS[grade] || GRADE_COLORS['C'];
+  const clientMode = (typeof CLIENT_MODE !== 'undefined' && CLIENT_MODE);
+  if (clientMode) {
+    return `<div class="grade-badge" style="background:${gc.bg};color:${gc.text};border-color:${gc.border};width:26px;height:26px;font-size:13px">${grade}</div>`;
+  }
+  return `<div class="grade-badge" style="background:${gc.bg};color:${gc.text};border-color:${gc.border}">
+    <select class="grade-select" style="color:${gc.text}" onchange="setGrade(${idx},this.value)" title="Override neighborhood grade">
+      ${['A','B','C','D'].map(g => `<option value="${g}" ${g===grade?'selected':''}>${g}</option>`).join('')}
+    </select>
+  </div>`;
+}
+
+function setGrade(idx, grade) {
+  properties[idx].grade = grade;
+  renderTable();
+}
+
+
+let sortCol = null;   // 'monthlyCF' | 'capRate' | 'coc' | 'price' | 'dom' | 'cf' | 'roi'
+let sortDir = 'desc'; // 'asc' | 'desc'
+let filterType = 'all'; // 'all' | 'Duplex' | 'Triplex' | 'Quadruplex'
+let filterStatus = 'all'; // 'all' | 'pass' | 'fail'
+
+function sortRows(rows) {
+  if (!sortCol) return rows;
+  return [...rows].sort((a, b) => {
+    let av, bv;
+    const getV = (r) => {
+      const y1 = r.a.years[0];
+      switch(sortCol) {
+        case 'price':     return r.p.listPrice;
+        case 'monthlyCF': return y1.monthlyCF;
+        case 'cf':        return y1.cfPerDoor/12;
+        case 'capRate':   return y1.capRate;
+        case 'coc':       return y1.coc;
+        case 'roi':       return y1.roiWithApp;
+        case 'dom':       return r.p.dom;
+        case 'rent':      return r.p.units.reduce((s,u)=>s+u.effectiveRent,0);
+        default: return 0;
+      }
+    };
+    av = getV(a); bv = getV(b);
+    return sortDir === 'desc' ? bv - av : av - bv;
+  });
+}
+
+function thSort(col, label) {
+  const isActive = sortCol === col;
+  const cls = isActive ? (sortDir === 'desc' ? 'sort-desc' : 'sort-asc') : '';
+  return `<th class="sortable ${cls}" onclick="setSort('${col}')">${label}</th>`;
+}
+
+function setSort(col) {
+  if (sortCol === col) {
+    if (sortDir === 'desc') sortDir = 'asc';
+    else { sortCol = null; sortDir = 'desc'; }
+  } else {
+    sortCol = col;
+    sortDir = 'desc';
+  }
+  renderTable();
+}
+
+// ═══════════════════════════════════════════════════════
+// RENDER TABLE
+// ═══════════════════════════════════════════════════════
+function renderTable() {
+  const el = document.getElementById('results');
+  if (!properties.length) { el.innerHTML = ''; return; }
+
+  let rows = properties.map(p => ({ p, a: analyze(p) }));
+
+  // Apply filters
+  if (filterType !== 'all') rows = rows.filter(r => r.p.subType.toLowerCase().includes(filterType.toLowerCase()));
+  if (filterStatus === 'pass') rows = rows.filter(r => r.a.years[0].cfPerDoor/12 >= WS.minCF && r.a.years[0].capRate >= WS.minCapRate);
+  if (filterStatus === 'fail') rows = rows.filter(r => r.a.years[0].cfPerDoor/12 < WS.minCF || r.a.years[0].capRate < WS.minCapRate);
+
+  // Apply sort
+  rows = sortRows(rows);
+
+  const allRows = properties.map(p => ({ p, a: analyze(p) }));
+  const passing = allRows.filter(r => r.a.years[0].cfPerDoor/12 >= WS.minCF && r.a.years[0].capRate >= WS.minCapRate).length;
+
+  let html = `
+    <div class="results-header">
+      <h2>📊 ${properties.length} Properties — ${passing} Pass Filters</h2>
+      <div style="display:flex;align-items:center;gap:10px">
+        <span style="font-size:12px;color:var(--muted)">Min CF: ${fmt$(WS.minCF)}/door/mo · Min Cap: ${fmtPct(WS.minCapRate)}</span>
+        <button class="btn-export" onclick="openExportModal()">📤 Export Client Copy</button>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <label>TYPE:</label>
+      <select onchange="filterType=this.value;renderTable()">
+        <option value="all" ${filterType==='all'?'selected':''}>All Types</option>
+        <option value="Duplex" ${filterType==='Duplex'?'selected':''}>Duplex</option>
+        <option value="Triplex" ${filterType==='Triplex'?'selected':''}>Triplex</option>
+        <option value="Quadruplex" ${filterType==='Quadruplex'?'selected':''}>Quadruplex</option>
+      </select>
+      <div class="filter-sep"></div>
+      <label>SHOW:</label>
+      <select onchange="filterStatus=this.value;renderTable()">
+        <option value="all" ${filterStatus==='all'?'selected':''}>All Properties</option>
+        <option value="pass" ${filterStatus==='pass'?'selected':''}>Passing Only</option>
+        <option value="fail" ${filterStatus==='fail'?'selected':''}>Failing Only</option>
+      </select>
+      <div class="filter-sep"></div>
+      <label>SHOWING ${rows.length} of ${properties.length}</label>
+      ${sortCol ? `<button class="filter-clear" onclick="sortCol=null;sortDir='desc';renderTable()">✕ Clear Sort</button>` : ''}
+    </div>
+
+    <table>
+      <thead>
+        <tr>
+          <th>ADDRESS</th>
+          <th>GRADE</th>
+          <th>TYPE</th>
+          ${thSort('price','PRICE')}
+          <th>UNITS</th>
+          ${thSort('rent','GROSS RENT/MO')}
+          ${thSort('monthlyCF','MONTHLY CF')}
+          ${thSort('cf','CF/DOOR')}
+          ${thSort('capRate','CAP RATE')}
+          ${thSort('coc','COC')}
+          <th>1% RULE</th>
+          ${thSort('dom','DOM')}
+          <th>ACTIONS</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  for (const {p, a} of rows) {
+    const y1 = a.years[0];
+    const idx = properties.indexOf(p);
+    const monthlyRent = p.units.reduce((s,u)=>s+u.effectiveRent,0);
+    const cfPass = y1.cfPerDoor/12 >= WS.minCF;
+    const capPass = y1.capRate >= WS.minCapRate;
+    const onePass = a.onePercent >= 0.01;
+
+    html += `
+      <tr onclick="openModal(${idx})">
+        <td class="addr">
+          ${p.address.split(',')[0]}
+          <a href="${zillowURL(p.address)}" target="_blank" onclick="event.stopPropagation()" class="zillow-link" title="View on Zillow">Z↗</a>
+        </td>
+        <td onclick="event.stopPropagation()" style="text-align:center">
+          ${gradeCell(idx, p.grade)}
+        </td>
+        <td><span class="pill pill-blue">${p.subType}</span></td>
+        <td class="price">${fmt$(p.listPrice)}</td>
+        <td style="text-align:center">${p.units.length}</td>
+        <td>${fmt$(monthlyRent)}${p.units.some(u=>u.rentSource!=='confirmed') ? '<span title="Some units use FMR or estimated rent" style="color:var(--warn);margin-left:3px;font-size:10px">*</span>' : ''}</td>
+        <td><span class="pill ${y1.monthlyCF >= 0 ? 'pill-pass' : 'pill-fail'}">${fmt$(y1.monthlyCF)}/mo</span></td>
+        <td><span class="pill ${cfPass ? 'pill-pass' : 'pill-fail'}">${fmt$(y1.cfPerDoor/12)}/mo</span></td>
+        <td><span class="pill ${capPass ? 'pill-pass' : 'pill-fail'}">${fmtPct(y1.capRate)}</span></td>
+        <td><span class="pill ${y1.coc >= 0.08 ? 'pill-pass' : 'pill-warn'}">${fmtPct(y1.coc)}</span></td>
+        <td><span class="pill ${onePass ? 'pill-pass' : 'pill-fail'}">${fmtPct(a.onePercent)}</span></td>
+        <td style="color:${p.dom < 30 ? 'var(--pass)' : p.dom < 90 ? 'var(--warn)' : 'var(--fail)'}">${p.dom}d</td>
+        <td onclick="event.stopPropagation()" style="white-space:nowrap">
+          <button class="btn-report" onclick="openModal(${idx})">View</button>
+          <button class="btn-offer" onclick="openOfferCalc(${idx})">$ Offer</button>
+        </td>
+      </tr>
+    `;
+  }
+
+  html += '</tbody></table>';
+  el.innerHTML = html;
+}
+
+// ═══════════════════════════════════════════════════════
+// MODAL
+// ═══════════════════════════════════════════════════════
+function openModal(idx) {
+  currentProp = properties[idx];
+  const p = currentProp;
+  const a = analyze(p);
+  const y1 = a.years[0];
+
+  const gc = GRADE_COLORS[p.grade] || GRADE_COLORS['C'];
+  const gradeBadgeLarge = `<span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:6px;background:${gc.bg};color:${gc.text};border:1px solid ${gc.border};font-size:14px;font-weight:800;margin-left:10px;vertical-align:middle">${p.grade}</span>`;
+
+  document.getElementById('modal-title').innerHTML =
+    `${p.address}${gradeBadgeLarge} <a href="${zillowURL(p.address)}" target="_blank" style="font-size:12px;color:var(--accent);font-weight:400;margin-left:8px;text-decoration:none;" title="View on Zillow">View on Zillow ↗</a>`;
+
+  const clientMode = (typeof CLIENT_MODE !== 'undefined' && CLIENT_MODE);
+
+  let unitRows = '';
+  for (let i = 0; i < p.units.length; i++) {
+    const u = p.units[i];
+    const fmr = getFMR(p.zip, u.beds) || 0;
+    const statusClass = u.rentSource === 'confirmed' ? 'rent-confirmed' :
+                        u.rentSource === 'call' ? 'rent-call' : 'rent-fmr';
+    const statusLabel = u.rentSource === 'confirmed' ? '✅ Confirmed' :
+                        u.rentSource === 'call' ? '📞 Call Agent' : '🏛️ FMR';
+    if (clientMode) {
+      unitRows += `
+        <tr>
+          <td>${u.type}</td>
+          <td style="text-align:center">${u.beds}</td>
+          <td style="text-align:center">${u.occupied ? 'Yes' : 'No'}</td>
+          <td>${u.listedRent ? fmt$(u.listedRent) : '—'}</td>
+          <td>${fmr ? fmt$(fmr) : '—'}</td>
+          <td style="font-weight:600;color:var(--text)">${fmt$(u.effectiveRent)}</td>
+          <td><span class="rent-status ${statusClass}">${statusLabel}</span></td>
+        </tr>
+      `;
+    } else {
+      unitRows += `
+        <tr>
+          <td><input type="text" value="${u.type}" onchange="updateUnit(${idx},${i},'type',this.value)" style="width:80px"></td>
+          <td><input type="number" value="${u.beds}" min="0" max="10" onchange="updateUnit(${idx},${i},'beds',this.value)" style="width:48px;text-align:center"></td>
+          <td>
+            <select onchange="updateUnit(${idx},${i},'occupied',this.value)" style="width:60px">
+              <option value="true"  ${u.occupied ? 'selected' : ''}>Yes</option>
+              <option value="false" ${!u.occupied ? 'selected' : ''}>No</option>
+            </select>
+          </td>
+          <td><input type="number" value="${u.listedRent || ''}" placeholder="—" onchange="updateUnit(${idx},${i},'listedRent',this.value)" style="width:80px"></td>
+          <td id="fmr-cell-${idx}-${i}">${fmr ? fmt$(fmr) : '—'}</td>
+          <td><input type="number" id="rent-input-${idx}-${i}" value="${u.effectiveRent}" onchange="updateUnit(${idx},${i},'effectiveRent',this.value)" style="width:80px"></td>
+          <td>
+            <select class="rent-status ${statusClass}" onchange="updateUnit(${idx},${i},'rentSource',this.value);this.className='rent-status '+({confirmed:'rent-confirmed',call:'rent-call',fmr:'rent-fmr'}[this.value]||'rent-fmr')" style="font-size:10px;font-weight:600;padding:2px 4px;border-radius:4px;border:none;cursor:pointer">
+              <option value="confirmed" ${u.rentSource==='confirmed'?'selected':''}>✅ Confirmed</option>
+              <option value="fmr"       ${u.rentSource==='fmr'      ?'selected':''}>🏛️ FMR</option>
+              <option value="call"      ${u.rentSource==='call'     ?'selected':''}>📞 Call Agent</option>
+            </select>
+          </td>
+        </tr>
+      `;
+    }
+  }
+
+  const monthlyRent = p.units.reduce((s,u)=>s+u.effectiveRent,0);
+
+  let content = `
+    <div class="modal-section">
+      <h3>PROPERTY DETAILS</h3>
+      <div class="kv-grid">
+        <div class="kv"><label>List Price</label><input type="number" value="${p.listPrice}" ${clientMode ? 'readonly' : `onchange="updateField(${idx},'listPrice',this.value)"`}></div>
+        <div class="kv"><label>Type</label><input value="${p.subType}" readonly></div>
+        <div class="kv"><label>Year Built</label><input value="${p.yrBuilt}" readonly></div>
+        <div class="kv"><label>Annual Tax</label><input type="number" value="${p.annualTax}" ${clientMode ? 'readonly' : `onchange="updateField(${idx},'annualTax',this.value)"`}></div>
+        <div class="kv"><label>MLS #</label><input value="${p.mlsNum}" readonly></div>
+        <div class="kv"><label>ZIP</label><input value="${p.zip}" readonly></div>
+      </div>
+      <div style="margin-top:12px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+        <span style="font-size:10px;color:var(--muted)">NEIGHBORHOOD GRADE</span>
+        ${clientMode
+          ? `<div class="grade-badge" style="background:${gc.bg};color:${gc.text};border-color:${gc.border};width:32px;height:32px;font-size:16px;font-weight:800">${p.grade}</div>`
+          : `<div class="grade-badge" style="background:${gc.bg};color:${gc.text};border-color:${gc.border};width:32px;height:32px;font-size:13px">
+               <select class="grade-select" style="color:${gc.text};font-size:14px;font-weight:800" onchange="setGrade(${idx},this.value);openModal(${idx})">
+                 ${['A','B','C','D'].map(g => `<option value="${g}" ${g===p.grade?'selected':''}>${g}</option>`).join('')}
+               </select>
+             </div>`
+        }
+        <span style="font-size:10px;color:var(--muted);font-style:italic">ZIP-level estimate · conditions vary street to street · verify locally</span>
+      </div>
+    </div>
+
+    <div class="modal-section">
+      <h3>UNIT RENTS</h3>
+      <div class="unit-table-wrap">
+        <table class="unit-table">
+          <thead>
+            <tr>
+              <th>Type</th><th>Beds</th><th>Occupied</th>
+              <th>Listed Rent</th><th>FMR</th><th>Used Rent</th><th>Status</th>
+            </tr>
+          </thead>
+          <tbody>${unitRows}</tbody>
+        </table>
+      </div>
+      <p class="recalc-note">
+        ${clientMode
+          ? `FMR = <a href="https://www.huduser.gov/portal/datasets/fmr/smallarea/index.html" target="_blank" style="color:var(--accent)">HUD FY2026 Small Area Fair Market Rents ↗</a> · Tax per MLS (Tax Year ${p.taxYear || '2024'})`
+          : `All unit fields are editable. Changing Beds auto-updates FMR. · FMR = <a href="https://www.huduser.gov/portal/datasets/fmr/smallarea/index.html" target="_blank" style="color:var(--accent)">HUD FY2026 Small Area Fair Market Rents ↗</a> · Tax per MLS (Tax Year ${p.taxYear || '2024'})`
+        }
+      </p>
+    </div>
+
+    <div class="modal-section" id="modal-metrics-section">
+      <h3>YEAR 1 METRICS</h3>
+      <div class="metrics-grid">
+        <div class="metric-box ${y1.monthlyCF >= WS.minCF * p.units.length ? 'metric-pass' : 'metric-fail'}">
+          <div class="val">${fmt$(y1.monthlyCF)}</div>
+          <div class="lbl">Monthly CF</div>
+        </div>
+        <div class="metric-box ${y1.cfPerDoor/12 >= WS.minCF ? 'metric-pass' : 'metric-fail'}">
+          <div class="val">${fmt$(y1.cfPerDoor/12)}</div>
+          <div class="lbl">CF / Door / Mo</div>
+        </div>
+        <div class="metric-box ${y1.capRate >= WS.minCapRate ? 'metric-pass' : 'metric-fail'}">
+          <div class="val">${fmtPct(y1.capRate)}</div>
+          <div class="lbl">Cap Rate</div>
+        </div>
+        <div class="metric-box ${y1.coc >= 0.08 ? 'metric-pass' : 'metric-warn'}">
+          <div class="val">${fmtPct(y1.coc)}</div>
+          <div class="lbl">CoC Return</div>
+        </div>
+        <div class="metric-box ${a.onePercent >= 0.01 ? 'metric-pass' : 'metric-fail'}">
+          <div class="val">${fmtPct(a.onePercent)}</div>
+          <div class="lbl">1% Rule</div>
+        </div>
+        <div class="metric-box ${y1.roiWithApp >= 0.20 ? 'metric-pass' : 'metric-warn'}">
+          <div class="val">${fmtPct(y1.roiWithApp)}</div>
+          <div class="lbl">ROI w/ App</div>
+        </div>
+      </div>
+
+      <div class="metrics-grid" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="metric-box">
+          <div class="val" style="font-size:13px">${fmt$(a.loan)}</div>
+          <div class="lbl">Loan Amount</div>
+        </div>
+        <div class="metric-box">
+          <div class="val" style="font-size:13px">${fmt$(a.monthly)}/mo</div>
+          <div class="lbl">Mortgage P&I</div>
+        </div>
+        <div class="metric-box">
+          <div class="val" style="font-size:13px">${fmt$(a.downPayment)}</div>
+          <div class="lbl">Down + Closing</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-section" id="modal-projections-section">
+      <h3>5-YEAR PROJECTIONS</h3>
+      <div style="overflow-x:auto">
+        <table class="unit-table">
+          <thead>
+            <tr>
+              <th>Year</th><th>Annual CF</th><th>Principal Red.</th>
+              <th>Tax Saved/(Owed)</th><th>Appreciation</th>
+              <th>ROI w/ App</th><th>ROI w/o App</th><th>Cap Rate</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${a.years.map(y => {
+              const taxVal = y.taxSaved > 0 ? y.taxSaved : -y.taxPaid;
+              const taxColor = taxVal >= 0 ? 'var(--pass)' : 'var(--fail)';
+              const taxStr = taxVal >= 0 ? fmt$(taxVal) : `(${fmt$(Math.abs(taxVal))})`;
+              return `
+              <tr>
+                <td>Yr ${y.yr}</td>
+                <td style="color:${y.annualCF>=0?'var(--pass)':'var(--fail)'}">${fmt$(y.annualCF)}</td>
+                <td style="color:var(--accent2)">${fmt$(y.prinReduction)}</td>
+                <td style="color:${taxColor}">${taxStr}</td>
+                <td style="color:var(--accent)">${fmt$(y.appreciation)}</td>
+                <td><b>${fmtPct(y.roiWithApp)}</b></td>
+                <td>${fmtPct(y.roiWithout)}</td>
+                <td>${fmtPct(y.capRate)}</td>
+              </tr>
+            `}).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn-primary" onclick="generatePDF(${idx})">⬇ Download PDF Report</button>
+      <button class="btn-secondary" onclick="closeModal()">Close</button>
+    </div>
+  `;
+
+  document.getElementById('modal-content').innerHTML = content;
+  document.getElementById('modal-overlay').classList.add('open');
+}
+
+function updateUnit(propIdx, unitIdx, field, val) {
+  const unit = properties[propIdx].units[unitIdx];
+  if (field === 'beds') {
+    unit.beds = parseInt(val) || 0;
+    // Auto-update FMR display cell
+    const fmr = getFMR(properties[propIdx].zip, unit.beds) || 0;
+    const cell = document.getElementById(`fmr-cell-${propIdx}-${unitIdx}`);
+    if (cell) cell.textContent = fmr ? fmt$(fmr) : '—';
+    // If this unit uses FMR as its rent source, update effectiveRent too
+    if (unit.rentSource === 'fmr' && fmr) {
+      unit.effectiveRent = fmr;
+      const rentInput = document.getElementById(`rent-input-${propIdx}-${unitIdx}`);
+      if (rentInput) rentInput.value = fmr;
+    }
+  } else if (field === 'occupied') {
+    unit.occupied = (val === 'true');
+  } else if (field === 'listedRent') {
+    unit.listedRent = parseFloat(val) || 0;
+  } else if (field === 'effectiveRent') {
+    unit.effectiveRent = parseFloat(val) || 0;
+  } else if (field === 'rentSource') {
+    unit.rentSource = val;
+  } else if (field === 'type') {
+    unit.type = val;
+  }
+  refreshModalMetrics(propIdx);
+  renderTable();
+}
+
+function refreshModalMetrics(propIdx) {
+  const p = properties[propIdx];
+  const a = analyze(p);
+  const y1 = a.years[0];
+
+  const ms = document.getElementById('modal-metrics-section');
+  if (ms) {
+    ms.innerHTML = `
+      <h3>YEAR 1 METRICS</h3>
+      <div class="metrics-grid">
+        <div class="metric-box ${y1.monthlyCF >= WS.minCF * p.units.length ? 'metric-pass' : 'metric-fail'}">
+          <div class="val">${fmt$(y1.monthlyCF)}</div><div class="lbl">Monthly CF</div>
+        </div>
+        <div class="metric-box ${y1.cfPerDoor/12 >= WS.minCF ? 'metric-pass' : 'metric-fail'}">
+          <div class="val">${fmt$(y1.cfPerDoor/12)}</div><div class="lbl">CF / Door / Mo</div>
+        </div>
+        <div class="metric-box ${y1.capRate >= WS.minCapRate ? 'metric-pass' : 'metric-fail'}">
+          <div class="val">${fmtPct(y1.capRate)}</div><div class="lbl">Cap Rate</div>
+        </div>
+        <div class="metric-box ${y1.coc >= 0.08 ? 'metric-pass' : 'metric-warn'}">
+          <div class="val">${fmtPct(y1.coc)}</div><div class="lbl">CoC Return</div>
+        </div>
+        <div class="metric-box ${a.onePercent >= 0.01 ? 'metric-pass' : 'metric-fail'}">
+          <div class="val">${fmtPct(a.onePercent)}</div><div class="lbl">1% Rule</div>
+        </div>
+        <div class="metric-box ${y1.roiWithApp >= 0.20 ? 'metric-pass' : 'metric-warn'}">
+          <div class="val">${fmtPct(y1.roiWithApp)}</div><div class="lbl">ROI w/ App</div>
+        </div>
+      </div>
+      <div class="metrics-grid" style="grid-template-columns:1fr 1fr 1fr">
+        <div class="metric-box">
+          <div class="val" style="font-size:13px">${fmt$(a.loan)}</div><div class="lbl">Loan Amount</div>
+        </div>
+        <div class="metric-box">
+          <div class="val" style="font-size:13px">${fmt$(a.monthly)}/mo</div><div class="lbl">Mortgage P&I</div>
+        </div>
+        <div class="metric-box">
+          <div class="val" style="font-size:13px">${fmt$(a.downPayment)}</div><div class="lbl">Down + Closing</div>
+        </div>
+      </div>
+    `;
+  }
+
+  const ps = document.getElementById('modal-projections-section');
+  if (ps) {
+    ps.innerHTML = `
+      <h3>5-YEAR PROJECTIONS</h3>
+      <div style="overflow-x:auto">
+        <table class="unit-table">
+          <thead>
+            <tr>
+              <th>Year</th><th>Annual CF</th><th>Principal Red.</th>
+              <th>Tax Saved/(Owed)</th><th>Appreciation</th>
+              <th>ROI w/ App</th><th>ROI w/o App</th><th>Cap Rate</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${a.years.map(y => {
+              const taxVal = y.taxSaved > 0 ? y.taxSaved : -y.taxPaid;
+              const taxColor = taxVal >= 0 ? 'var(--pass)' : 'var(--fail)';
+              const taxStr = taxVal >= 0 ? fmt$(taxVal) : `(${fmt$(Math.abs(taxVal))})`;
+              return `<tr>
+                <td>Yr ${y.yr}</td>
+                <td style="color:${y.annualCF>=0?'var(--pass)':'var(--fail)'}">${fmt$(y.annualCF)}</td>
+                <td style="color:var(--accent2)">${fmt$(y.prinReduction)}</td>
+                <td style="color:${taxColor}">${taxStr}</td>
+                <td style="color:var(--accent)">${fmt$(y.appreciation)}</td>
+                <td><b>${fmtPct(y.roiWithApp)}</b></td>
+                <td>${fmtPct(y.roiWithout)}</td>
+                <td>${fmtPct(y.capRate)}</td>
+              </tr>`;
+            }).join('')}
+          </tbody>
+        </table>
+      </div>
+    `;
+  }
+}
+
+function updateField(propIdx, field, val) {
+  if (field === 'listPrice' || field === 'annualTax') {
+    properties[propIdx][field] = parseInt(val) || 0;
+  }
+  renderTable();
+}
+
+function closeModal() {
+  document.getElementById('modal-overlay').classList.remove('open');
+  currentProp = null;
+  renderTable();
+}
+
+document.getElementById('modal-close').onclick = closeModal;
+document.getElementById('modal-overlay').onclick = function(e) {
+  if (e.target === this) closeModal();
+};
+
+// ═══════════════════════════════════════════════════════
+// PDF REPORT GENERATOR (jsPDF) — print-friendly white
+// ═══════════════════════════════════════════════════════
+function generatePDF(idx) {
+  const p = properties[idx];
+  const a = analyze(p);
+  const y1 = a.years[0];
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+
+  const W = 612, H = 792;
+  const L = 44, R = W - 44, TW = R - L;
+
+  // ── Color palette (print-friendly light theme) ──
+  const WHITE    = [255,255,255];
+  const NAVY     = [15, 32, 72];       // header bg
+  const BLUE     = [37,99,235];        // accent / links
+  const LGRAY    = [245,247,250];      // row alternates / section bg
+  const MGRAY    = [209,213,219];      // borders
+  const DGRAY    = [75,85,99];         // secondary text
+  const BLACK    = [17,24,39];         // primary text
+  const GREEN    = [5,150,105];        // pass
+  const RED      = [220,38,38];        // fail
+  const AMBER    = [180,100,0];        // warn
+
+  // ── Helpers ──
+  let cy = 0; // current y
+
+  function setFont(style='normal', size=8, color=BLACK) {
+    doc.setFont('helvetica', style);
+    doc.setFontSize(size);
+    doc.setTextColor(...color);
+  }
+
+  function hline(yy, color=MGRAY, lw=0.5) {
+    doc.setDrawColor(...color);
+    doc.setLineWidth(lw);
+    doc.line(L, yy, R, yy);
+  }
+
+  function rect(x,y,w,h,fill,stroke=null) {
+    if (fill) { doc.setFillColor(...fill); doc.rect(x,y,w,h,'F'); }
+    if (stroke) { doc.setDrawColor(...stroke); doc.setLineWidth(0.5); doc.rect(x,y,w,h,'S'); }
+  }
+
+  function sectionBar(title, yy) {
+    rect(L, yy, TW, 17, NAVY);
+    setFont('bold', 7.5, WHITE);
+    doc.text(title, L+8, yy+12);
+    return yy + 22;
+  }
+
+  function kv(label, value, x, y, valColor=BLACK) {
+    setFont('normal', 7.5, DGRAY);
+    doc.text(label, x, y);
+    setFont('bold', 8, valColor);
+    doc.text(String(value), x + 88, y);
+  }
+
+  function twoColKV(leftPairs, rightPairs, yy, rh=16) {
+    const mid = L + TW/2 + 4;
+    const maxR = Math.max(leftPairs.length, rightPairs.length);
+    for (let i=0; i<maxR; i++) {
+      const rowY = yy + i*rh + 11;
+      if (i%2===0) { rect(L, yy+i*rh, TW, rh, LGRAY); }
+      if (leftPairs[i])  kv(leftPairs[i][0], leftPairs[i][1], L+4, rowY, leftPairs[i][2]||BLACK);
+      if (rightPairs[i]) kv(rightPairs[i][0], rightPairs[i][1], mid, rowY, rightPairs[i][2]||BLACK);
+    }
+    hline(yy + maxR*rh, MGRAY);
+    return yy + maxR*rh + 6;
+  }
+
+  // ══════════════════════════════════════
+  // HEADER
+  // ══════════════════════════════════════
+  rect(0, 0, W, 58, NAVY);
+
+  // Blue accent stripe on left
+  rect(0, 0, 5, 58, BLUE);
+
+  setFont('bold', 7, [180,200,255]);
+  doc.text('INVESTMENT PROPERTY ANALYSIS', L+4, 16);
+
+  // Address — truncate if needed
+  const addrShort = p.address.split(',')[0];
+  const addrFull = p.address;
+  setFont('bold', 16, WHITE);
+  doc.text(addrShort.length > 28 ? addrShort.substring(0,28)+'…' : addrShort, L+4, 38);
+
+  setFont('normal', 8, [180,200,255]);
+  const cityState = p.address.split(',').slice(1).join(',').trim();
+  doc.text(cityState, L+4, 51);
+
+  // Agent info — use baked-in if client copy, else defaults
+  const pdfAgent  = (typeof AGENT_NAME  !== 'undefined') ? AGENT_NAME  : 'Josiah Litvak';
+  const pdfPhone  = (typeof AGENT_PHONE !== 'undefined') ? AGENT_PHONE : '216-469-5867';
+  const pdfEmail  = (typeof AGENT_EMAIL !== 'undefined') ? AGENT_EMAIL : 'josiahlitvak@gmail.com';
+
+  // Right side: agent info
+  setFont('bold', 8, WHITE);
+  doc.text(pdfAgent, R, 22, {align:'right'});
+  setFont('normal', 7.5, [180,200,255]);
+  doc.text('Licensed Realtor · Northeast Ohio (Cuyahoga & Lorain County)', R, 33, {align:'right'});
+  doc.text(pdfPhone + ' · ' + pdfEmail, R, 44, {align:'right'});
+  setFont('normal', 7, [140,160,210]);
+  doc.text(`Prepared ${new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'})}`, R, 54, {align:'right'});
+
+  cy = 70;
+
+  // ══════════════════════════════════════
+  // QUICK STATS BAR
+  // ══════════════════════════════════════
+  const monthlyRent = p.units.reduce((s,u)=>s+u.effectiveRent,0);
+  const pdfGradeColors = { 'A': GREEN, 'B': BLUE, 'C': AMBER, 'D': RED };
+  const gradeColor = pdfGradeColors[p.grade] || AMBER;
+  const stats = [
+    { label:'LIST PRICE',   val: fmt$(p.listPrice) },
+    { label:'NEIGHBORHOOD', val: `Grade ${p.grade}`, color: gradeColor },
+    { label:'MONTHLY CF',   val: fmt$(y1.monthlyCF),    color: y1.monthlyCF>=0 ? GREEN : RED },
+    { label:'CAP RATE',     val: fmtPct(y1.capRate),    color: y1.capRate>=WS.minCapRate ? GREEN : RED },
+    { label:'COC RETURN',   val: fmtPct(y1.coc),        color: y1.coc>=0.08 ? GREEN : AMBER },
+    { label:'ROI W/ APP',   val: fmtPct(y1.roiWithApp), color: y1.roiWithApp>=0.20 ? GREEN : AMBER },
+  ];
+  const sw = TW / stats.length;
+  rect(L, cy, TW, 38, LGRAY, MGRAY);
+  stats.forEach((s,i) => {
+    const sx = L + i*sw;
+    if (i>0) { doc.setDrawColor(...MGRAY); doc.setLineWidth(0.5); doc.line(sx, cy, sx, cy+38); }
+    setFont('normal', 6.5, DGRAY);
+    doc.text(s.label, sx + sw/2, cy+11, {align:'center'});
+    setFont('bold', 11, s.color||BLACK);
+    doc.text(s.val, sx + sw/2, cy+28, {align:'center'});
+  });
+  cy += 44;
+
+  // ══════════════════════════════════════
+  // I. TRANSACTION DETAILS
+  // ══════════════════════════════════════
+  cy = sectionBar('I. TRANSACTION DETAILS', cy);
+  cy = twoColKV(
+    [['Purchase Price',     fmt$(p.listPrice)],
+     ['Down Payment (20%)', fmt$(p.listPrice*0.20)],
+     ['Closing Costs',      fmt$(WS.closingCost)],
+     ['Total Cash Needed',  fmt$(a.downPayment), BLUE],
+     ['Loan Amount',        fmt$(a.loan)]],
+    [['Gross Monthly Rent', fmt$(monthlyRent)],
+     ['Gross Annual Income',fmt$(monthlyRent*12)],
+     ['Annual Property Tax',fmt$(p.annualTax)],
+     ['Year Built',         p.yrBuilt||'N/A'],
+     ['MLS #',              p.mlsNum]],
+    cy
+  );
+
+  // Grade row
+  rect(L, cy, TW, 20, LGRAY);
+  setFont('normal', 7.5, DGRAY);
+  doc.text('Neighborhood Grade', L+4, cy+13);
+  setFont('bold', 12, gradeColor);
+  doc.text(`Grade ${p.grade}`, L+92, cy+13);
+  setFont('italic', 6.5, DGRAY);
+  doc.text('ZIP-level estimate only — conditions vary street to street. Verify locally before making investment decisions.', L+130, cy+13);
+  cy += 26;
+
+  // ══════════════════════════════════════
+  // II. UNIT BREAKDOWN
+  // ══════════════════════════════════════
+  cy = sectionBar('II. UNIT BREAKDOWN', cy);
+
+  // Table header
+  const ucols = [L+2, L+90, L+138, L+186, L+255, L+330, L+400];
+  const uhdrs = ['TYPE','BEDS','OCCUPIED','LISTED RENT','USED RENT','RENT SOURCE','STATUS'];
+  rect(L, cy, TW, 14, [230,234,240]);
+  setFont('bold', 6.5, DGRAY);
+  uhdrs.forEach((h,i) => doc.text(h, ucols[i], cy+10));
+  cy += 14;
+
+  for (let i=0; i<p.units.length; i++) {
+    const u = p.units[i];
+    if (i%2===1) rect(L, cy, TW, 16, LGRAY);
+    const srcLabel = u.rentSource==='confirmed' ? 'Confirmed' :
+                     u.rentSource==='call'      ? 'Call Agent' :
+                     u.rentSource==='fmr'       ? 'HUD FMR'   : 'Override';
+    const srcColor = u.rentSource==='confirmed' ? GREEN :
+                     u.rentSource==='call'      ? RED   : AMBER;
+    const occupiedLabel = u.occupied ? 'Yes' : 'No';
+    setFont('normal', 8, BLACK);
+    doc.text(u.type,                             ucols[0], cy+11);
+    doc.text(String(u.beds),                     ucols[1], cy+11);
+    doc.text(occupiedLabel,                      ucols[2], cy+11);
+    doc.text(u.listedRent ? fmt$(u.listedRent) : '—', ucols[3], cy+11);
+    setFont('bold', 8, BLACK);
+    doc.text(fmt$(u.effectiveRent),              ucols[4], cy+11);
+    setFont('bold', 7.5, srcColor);
+    doc.text(srcLabel,                           ucols[5], cy+11);
+    // Rent note
+    const note = u.rentSource==='fmr'  ? 'HUD FY2026 SAFMR' :
+                 u.rentSource==='call' ? 'Verify w/ agent'  :
+                 u.rentSource==='confirmed' ? 'Per MLS'     : 'Manual override';
+    setFont('normal', 6.5, DGRAY);
+    doc.text(note, ucols[6], cy+11);
+    hline(cy+16, MGRAY, 0.3);
+    cy += 16;
+  }
+  cy += 4;
+
+  // ══════════════════════════════════════
+  // III. EXPENSE BREAKDOWN (YR 1)
+  // ══════════════════════════════════════
+  cy = sectionBar('III. EXPENSE BREAKDOWN (YEAR 1)', cy);
+  const egi = y1.egi;
+  cy = twoColKV(
+    [['Gross Income (GI)',      fmt$(monthlyRent*12)],
+     ['Vacancy (5% of GI)',     fmt$(monthlyRent*12*WS.vacancyPct)],
+     ['Eff. Gross Income (EGI)',fmt$(egi), BLUE],
+     ['Property Taxes',         fmt$(p.annualTax)],
+     ['Insurance',              fmt$(WS.insurance)]],
+    [['Management (8% EGI)',    fmt$(egi*WS.mgmtPct)],
+     ['CapEx (5% EGI)',         fmt$(egi*WS.capexPct)],
+     ['Repairs / Utilities',    '$0'],
+     ['Total OpEx',             fmt$(y1.opex), RED],
+     ['Annual Debt Service',    fmt$(y1.debtService)]],
+    cy
+  );
+
+  // NOI + CF highlight row
+  rect(L, cy, TW/2-2, 20, [235,250,244], GREEN);
+  rect(L+TW/2+2, cy, TW/2-2, 20, [235,250,244], GREEN);
+  setFont('normal', 7.5, DGRAY);
+  doc.text('Net Operating Income (NOI)', L+6, cy+8);
+  setFont('bold', 9, GREEN);
+  doc.text(fmt$(y1.noi), L+6, cy+17);
+  setFont('normal', 7.5, DGRAY);
+  doc.text('Annual Cash Flow', L+TW/2+8, cy+8);
+  setFont('bold', 9, y1.annualCF>=0?GREEN:RED);
+  doc.text(fmt$(y1.annualCF) + '  (' + fmt$(y1.monthlyCF) + '/mo)', L+TW/2+8, cy+17);
+  cy += 26;
+
+  // ══════════════════════════════════════
+  // IV. 5-YEAR PROJECTIONS
+  // ══════════════════════════════════════
+  cy = sectionBar('IV. THE FOUR BENEFITS — 5-YEAR PROJECTIONS', cy);
+
+  const tcols = [L+2, L+62, L+138, L+210, L+288, L+366, L+430, L+484];
+  const thdrs2 = ['YEAR','CASH FLOW','PRIN. PAY-DOWN','TAX SAVED/(OWED)','APPRECIATION','TOTAL BENEFIT','ROI W/ APP','COC'];
+  rect(L, cy, TW, 14, [230,234,240]);
+  setFont('bold', 6.5, DGRAY);
+  thdrs2.forEach((h,i) => doc.text(h, tcols[i], cy+10));
+  cy += 14;
+
+  for (let i=0; i<a.years.length; i++) {
+    const yr = a.years[i];
+    if (i%2===0) rect(L, cy, TW, 16, LGRAY);
+
+    const taxVal  = yr.taxSaved > 0 ? yr.taxSaved : -yr.taxPaid;
+    const taxStr  = taxVal >= 0 ? fmt$(taxVal) : `(${fmt$(Math.abs(taxVal))})`;
+    const taxColor = taxVal >= 0 ? GREEN : RED;
+    const totalBenefit = yr.annualCF + yr.prinReduction + taxVal + yr.appreciation;
+
+    setFont('normal', 8, DGRAY);
+    doc.text(`Year ${yr.yr}`, tcols[0], cy+11);
+    setFont('bold', 8, yr.annualCF>=0?GREEN:RED);
+    doc.text(fmt$(yr.annualCF), tcols[1], cy+11);
+    setFont('normal', 8, BLUE);
+    doc.text(fmt$(yr.prinReduction), tcols[2], cy+11);
+    setFont('bold', 8, taxColor);
+    doc.text(taxStr, tcols[3], cy+11);
+    setFont('normal', 8, BLUE);
+    doc.text(fmt$(yr.appreciation), tcols[4], cy+11);
+    setFont('bold', 8, GREEN);
+    doc.text(fmt$(totalBenefit), tcols[5], cy+11);
+    setFont('bold', 8, BLACK);
+    doc.text(fmtPct(yr.roiWithApp), tcols[6], cy+11);
+    setFont('normal', 8, DGRAY);
+    doc.text(fmtPct(yr.coc), tcols[7], cy+11);
+    hline(cy+16, MGRAY, 0.3);
+    cy += 16;
+  }
+  cy += 6;
+
+  // ══════════════════════════════════════
+  // V. KEY METRICS SCORECARD
+  // ══════════════════════════════════════
+  cy = sectionBar('V. KEY METRICS SCORECARD (YEAR 1)', cy);
+  cy += 4;
+
+  const metrics = [
+    { label:'Monthly CF',    val:fmt$(y1.monthlyCF),      pass:y1.monthlyCF>=WS.minCF*p.units.length,  sub:`Min: ${fmt$(WS.minCF*p.units.length)}/mo` },
+    { label:'CF / Door',     val:fmt$(y1.cfPerDoor/12)+'/mo', pass:y1.cfPerDoor/12>=WS.minCF,          sub:`Min: ${fmt$(WS.minCF)}/door` },
+    { label:'Cap Rate',      val:fmtPct(y1.capRate),      pass:y1.capRate>=WS.minCapRate,               sub:`Min: ${fmtPct(WS.minCapRate)}` },
+    { label:'CoC Return',    val:fmtPct(y1.coc),          pass:y1.coc>=0.08,                            sub:'Min: 8.0%' },
+    { label:'1% Rule',       val:fmtPct(a.onePercent),    pass:a.onePercent>=0.01,                      sub:'Min: 1.0%' },
+    { label:'ROI w/ App',    val:fmtPct(y1.roiWithApp),   pass:y1.roiWithApp>=0.20,                     sub:'Min: 20.0%' },
+  ];
+
+  const bCols = 3, bRows = Math.ceil(metrics.length/bCols);
+  const bw = (TW - (bCols-1)*6) / bCols;
+  const bh = 40;
+
+  metrics.forEach((m,i) => {
+    const col = i % bCols;
+    const row = Math.floor(i / bCols);
+    const bx = L + col*(bw+6);
+    const by = cy + row*(bh+5);
+    const passColor = m.pass ? GREEN : RED;
+    rect(bx, by, bw, bh, WHITE, passColor);
+    // Left accent bar
+    doc.setFillColor(...passColor);
+    doc.rect(bx, by, 3, bh, 'F');
+    setFont('normal', 7, DGRAY);
+    doc.text(m.label, bx+8, by+13);
+    setFont('bold', 13, passColor);
+    doc.text(m.val, bx+8, by+30);
+    setFont('normal', 6.5, DGRAY);
+    doc.text(m.sub, bx+bw-4, by+13, {align:'right'});
+    // Pass/fail badge
+    setFont('bold', 6.5, WHITE);
+    const badgeW = 24, badgeH = 10;
+    rect(bx+bw-badgeW-4, by+bh-badgeH-4, badgeW, badgeH, passColor);
+    doc.text(m.pass?'PASS':'FAIL', bx+bw-4-badgeW/2, by+bh-6, {align:'center'});
+  });
+
+  cy += bRows*(bh+5) + 8;
+
+  // ══════════════════════════════════════
+  // DISCLAIMER + FOOTER
+  // ══════════════════════════════════════
+  hline(cy, MGRAY);
+  cy += 6;
+  setFont('italic', 6.5, DGRAY);
+  const disc = 'This analysis is for informational purposes only and does not constitute financial, tax, or legal advice. Projections use standard assumptions: 20% down, 7.5% rate/30yr, $7,000 closing costs, 5% vacancy, $1,500 insurance/yr, 8% management fee, 5% CapEx reserve. Rent estimates use HUD FY2026 SAFMR where MLS data is unavailable. Consult qualified professionals before making investment decisions.';
+  const discLines = doc.splitTextToSize(disc, TW);
+  doc.text(discLines, L, cy);
+  cy += discLines.length * 8 + 8;
+
+  // Footer bar
+  const footerY = Math.max(cy, H - 32);
+  rect(0, footerY, W, H-footerY, NAVY);
+  rect(0, footerY, 5, H-footerY, BLUE);
+  setFont('bold', 8, WHITE);
+  doc.text(pdfAgent + ' · Licensed Realtor, Cuyahoga County OH', L+8, footerY+14);
+  setFont('normal', 7.5, [180,200,255]);
+  doc.text(pdfPhone + ' · ' + pdfEmail, L+8, footerY+24);
+  setFont('normal', 7, [140,160,210]);
+  doc.text('Information is believed to be accurate but not guaranteed.', R, footerY+19, {align:'right'});
+
+  const filename = `ClientReport_${p.address.split(',')[0].replace(/\s+/g,'_')}.pdf`;
+  doc.save(filename);
+}
+
+// ═══════════════════════════════════════════════════════
+// DROP + FILE EVENTS
+// ═══════════════════════════════════════════════════════
+
+const dz = document.getElementById('dropzone');
+if (dz) {
+  dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+  dz.addEventListener('drop', async e => {
+    e.preventDefault();
+    dz.classList.remove('drag-over');
+    const file = e.dataTransfer.files[0];
+    if (file && file.type === 'application/pdf') await loadPDF(file);
+  });
+}
+
+const fileInput = document.getElementById('file-input');
+if (fileInput) {
+  fileInput.addEventListener('change', async e => {
+    const file = e.target.files[0];
+    if (file) await loadPDF(file);
+  });
+}
+
+async function loadPDF(file) {
+  setStatus(`Parsing ${file.name}...`, 'parsing');
+  try {
+    properties = await parsePDF(file);
+    if (properties.length === 0) {
+      setStatus('⚠ No properties parsed — check console (F12) for debug info, or use the paste box.', 'error');
+    } else {
+      setStatus(`✓ Parsed ${properties.length} properties from ${file.name}`, 'done');
+      renderTable();
+      const dz2 = document.getElementById('dropzone');
+      const ps2 = document.getElementById('paste-section');
+      if (dz2) dz2.style.display = 'none';
+      if (ps2) ps2.style.display = 'none';
+    }
+  } catch(e) {
+    console.error(e);
+    setStatus('Error parsing PDF: ' + e.message, 'error');
+  }
+}
+
+// ── Paste box ──
+const pastBtn = document.getElementById('parse-paste-btn');
+if (pastBtn) pastBtn.addEventListener('click', () => {
+  const text = document.getElementById('paste-box').value.trim();
+  if (!text) return;
+  try {
+    const data = JSON.parse(text);
+    if (Array.isArray(data)) {
+      properties = data.map(convertFromClaudeJSON);
+      setStatus(`✓ Loaded ${properties.length} properties from paste`, 'done');
+      renderTable();
+      const dz3 = document.getElementById('dropzone');
+      const ps3 = document.getElementById('paste-section');
+      if (dz3) dz3.style.display = 'none';
+      if (ps3) ps3.style.display = 'none';
+    } else {
+      setStatus('JSON must be an array of properties', 'error');
+    }
+  } catch(e) {
+    setStatus('Invalid JSON: ' + e.message, 'error');
+  }
+});
+
+function convertFromClaudeJSON(obj) {
+  // Handle Tool 1 JSON format
+  const zip = (obj.address || '').match(/\d{5}/)?.[0] || '44105';
+  const units = (obj.units || []).map(u => {
+    const beds = parseInt(u.beds) || parseInt(u.bedrooms) || 2;
+    const listedRent = parseInt(u.rent) || parseInt(u.listedRent) || 0;
+    const occupied = u.occupied === true || u.occupied === 'Yes' || u.occupied === 'yes';
+    const fmr = getFMR(zip, beds);
+    let effectiveRent, rentSource;
+    if (occupied && listedRent > 0) {
+      effectiveRent = listedRent; rentSource = 'confirmed';
+    } else if (occupied && !listedRent) {
+      effectiveRent = fmr || 800; rentSource = 'call';
+    } else {
+      effectiveRent = fmr || listedRent || 800; rentSource = 'fmr';
+    }
+    return { type: u.type || `${beds} Bedroom`, beds, baths: parseFloat(u.baths)||1,
+             sqft: parseInt(u.sqft)||0, listedRent, effectiveRent, rentSource,
+             occupied, rentFlag: '' };
+  });
+  return {
+    address: obj.address || 'Unknown',
+    zip,
+    mlsNum: obj.mlsNum || obj.mls || '',
+    subType: obj.subType || obj.type || 'Duplex',
+    listPrice: parseInt(obj.listPrice || obj.price) || 0,
+    dom: parseInt(obj.dom) || 0,
+    yrBuilt: parseInt(obj.yrBuilt || obj.yearBuilt) || 0,
+    annualTax: parseInt(obj.annualTax || obj.taxes) || 2000,
+    taxYear: obj.taxYear || '2024',
+    parcelId: obj.parcelId || '',
+    units,
+    status: obj.status || 'Active',
+    grade: obj.grade || getZipGrade(zip)
+  };
+}
+
+// ═══════════════════════════════════════════════════════
+// OFFER PRICE CALCULATOR
+// ═══════════════════════════════════════════════════════
+let offerPropIdx = null;
+
+function openOfferCalc(idx) {
+  offerPropIdx = idx;
+  const p = properties[idx];
+  document.getElementById('offer-title').textContent = p.address.split(',')[0];
+  document.getElementById('offer-sub').textContent =
+    `${p.subType} · ${fmt$(p.listPrice)} asking · ${p.units.length} units · ZIP ${p.zip}`;
+  // Pre-fill with current WS defaults
+  document.getElementById('oc-cf').value  = WS.minCF;
+  document.getElementById('oc-cap').value = (WS.minCapRate * 100).toFixed(1);
+  document.getElementById('oc-coc').value = '8.0';
+  document.getElementById('oc-rate').value = (WS.rate * 100).toFixed(3);
+  recalcOffer();
+  document.getElementById('offer-overlay').classList.add('open');
+}
+
+function recalcOffer() {
+  if (offerPropIdx === null) return;
+  const p = properties[offerPropIdx];
+
+  const targetCFdoor = parseFloat(document.getElementById('oc-cf').value) || 300;
+  const targetCap    = (parseFloat(document.getElementById('oc-cap').value) || 6) / 100;
+  const targetCOC    = (parseFloat(document.getElementById('oc-coc').value) || 8) / 100;
+  const rate         = (parseFloat(document.getElementById('oc-rate').value) || 7.5) / 100;
+
+  const monthlyRent = p.units.reduce((s,u) => s+u.effectiveRent, 0);
+  const annualGI    = monthlyRent * 12;
+  const doors       = p.units.length;
+
+  // ── Solve for max price by each constraint ──
+
+  // 1. Cap Rate: NOI / price = targetCap
+  //    NOI = EGI - opex(fixed)  [mgmt & capex depend on EGI which depends on price only via vacancy]
+  //    EGI = GI * (1 - vacancy) = annualGI * 0.95  (vacancy doesn't depend on price)
+  const egi    = annualGI * (1 - WS.vacancyPct);
+  const opexFixed = WS.insurance + p.annualTax + WS.repairsAnnual;
+  const opexPct   = egi * (WS.mgmtPct + WS.capexPct);
+  const noi       = egi - opexFixed - opexPct;
+  const maxByCapRate = noi / targetCap;
+
+  // 2. CF/door: CF = NOI - debtService >= targetCFdoor * doors * 12
+  //    debtService = mortgage(price) = loan * r*(1+r)^n / ((1+r)^n-1) * 12
+  //    loan = price * (1 - downPct)
+  //    Solve: NOI - DS(price) = targetCF * doors * 12
+  //    DS(price) = price*(1-downPct) * mortgageFactor
+  const r = rate / 12, n = WS.term * 12;
+  const mf = r * Math.pow(1+r,n) / (Math.pow(1+r,n)-1); // monthly factor
+  const annualMF = mf * 12 * (1 - WS.downPct);           // annual debt per dollar of price
+  const targetAnnualCF = targetCFdoor * doors * 12;
+  const maxByCF = (noi - targetAnnualCF) / annualMF;
+
+  // 3. CoC: CF / (price*downPct + closingCost) = targetCOC
+  //    CF = NOI - price*annualMF
+  //    (NOI - price*annualMF) / (price*downPct + closingCost) = targetCOC
+  //    NOI - price*annualMF = targetCOC*(price*downPct + closingCost)
+  //    NOI - targetCOC*closingCost = price*(annualMF + targetCOC*downPct)
+  const maxByCOC = (noi - targetCOC * WS.closingCost) / (annualMF + targetCOC * WS.downPct);
+
+  // Max offer = most restrictive (minimum of the three)
+  const maxOffer = Math.min(maxByCapRate, maxByCF, maxByCOC);
+  const askingPrice = p.listPrice;
+  const gap = maxOffer - askingPrice;
+  const gapPct = (gap / askingPrice) * 100;
+
+  // Determine binding constraint
+  const constraints = [
+    { name: 'CF/Door',  max: maxByCF,      target: `${fmt$(targetCFdoor)}/door/mo` },
+    { name: 'Cap Rate', max: maxByCapRate,  target: fmtPct(targetCap) },
+    { name: 'CoC',      max: maxByCOC,      target: fmtPct(targetCOC) },
+  ];
+  const binding = constraints.reduce((a,b) => a.max < b.max ? a : b);
+
+  // Color the gap
+  const valClass = gap >= 0 ? 'good' : (gap >= -15000 ? 'close' : 'far');
+  const gapLabel = gap >= 0
+    ? `✓ You're under by ${fmt$(Math.abs(gap))}`
+    : `Needs ${fmt$(Math.abs(gap))} price reduction (${Math.abs(gapPct).toFixed(1)}% off ask)`;
+
+  document.getElementById('offer-result').innerHTML = `
+    <div class="offer-result-main">
+      <div>
+        <div class="label">MAX OFFER PRICE</div>
+        <div class="value ${valClass}">${fmt$(Math.max(maxOffer, 0))}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="label">ASKING PRICE</div>
+        <div class="value" style="font-size:16px;color:var(--muted)">${fmt$(askingPrice)}</div>
+      </div>
+    </div>
+
+    <div class="offer-gap">
+      <div>${gapLabel}</div>
+    </div>
+
+    <hr style="border:none;border-top:1px solid var(--border);margin:12px 0">
+
+    <div style="font-size:11px;color:var(--muted);margin-bottom:6px">
+      <b style="color:var(--warn)">Binding constraint: ${binding.name}</b> (target: ${binding.target})
+    </div>
+
+    <div class="offer-breakdown">
+      <div class="row">Cap Rate limit: <span>${fmt$(Math.max(maxByCapRate,0))}</span></div>
+      <div class="row">CF/Door limit:  <span>${fmt$(Math.max(maxByCF,0))}</span></div>
+      <div class="row">CoC limit:      <span>${fmt$(Math.max(maxByCOC,0))}</span></div>
+      <div class="row">NOI (yr1):      <span>${fmt$(noi)}</span></div>
+      <div class="row">Gross Rent/mo:  <span>${fmt$(monthlyRent)}</span></div>
+      <div class="row">EGI (yr1):      <span>${fmt$(egi)}</span></div>
+    </div>
+  `;
+}
+
+// ═══════════════════════════════════════════════════════
+// EXPORT CLIENT COPY
+// ═══════════════════════════════════════════════════════
+function openExportModal() {
+  document.getElementById('export-count').textContent = properties.length;
+  updateExportPreview();
+  document.getElementById('export-overlay').classList.add('open');
+}
+
+function updateExportPreview() {
+  const name   = document.getElementById('ex-name').value.trim()   || 'Your Name';
+  const phone  = document.getElementById('ex-phone').value.trim()  || 'Your Phone';
+  const email  = document.getElementById('ex-email').value.trim()  || 'Your Email';
+  const client = document.getElementById('ex-client').value.trim();
+  const clientPart = client ? ` &nbsp;·&nbsp; Prepared for <strong>${client}</strong>` : '';
+  document.getElementById('export-preview').innerHTML =
+    `Header will show: <strong>${name}</strong> · <strong>${phone}</strong> · <strong>${email}</strong>${clientPart}`;
+}
+
+['ex-name','ex-phone','ex-email','ex-client'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('input', updateExportPreview);
+});
+
+const exportCloseBtn = document.getElementById('export-close');
+if (exportCloseBtn) exportCloseBtn.onclick = () =>
+  document.getElementById('export-overlay').classList.remove('open');
+const exportOvlEl = document.getElementById('export-overlay');
+if (exportOvlEl) exportOvlEl.onclick = function(e) {
+  if (e.target === this) this.classList.remove('open');
+};
+
+function generateClientCopy() {
+  const agentName  = document.getElementById('ex-name').value.trim();
+  const agentPhone = document.getElementById('ex-phone').value.trim();
+  const agentEmail = document.getElementById('ex-email').value.trim();
+  const clientName = document.getElementById('ex-client').value.trim();
+
+  if (!agentName || !agentPhone || !agentEmail) {
+    alert('Please fill in all three fields before exporting.');
+    return;
+  }
+
+  const dateStr    = new Date().toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});
+  const propsJSON  = JSON.stringify(properties);
+
+  // ── Parse current page into a DOM we can safely manipulate ──
+  const parser = new DOMParser();
+  const cd     = parser.parseFromString(document.documentElement.outerHTML, 'text/html');
+
+  // 1. Update title and badge
+  cd.title = `Property Analysis · ${agentName}`;
+  const badge = cd.querySelector('.badge');
+  if (badge) badge.textContent = `CLIENT DECK · ${dateStr}`;
+
+  // 2. Remove upload / export UI elements
+  ['dropzone', 'paste-section', 'export-overlay', 'settings-overlay', 'btn-settings'].forEach(id => {
+    const el = cd.getElementById(id);
+    if (el) el.remove();
+  });
+
+  // 3. Remove the Export Client Copy button (it'll be in the results-header after render)
+  //    We do this by injecting CSS that hides it permanently
+  const hideStyle = cd.createElement('style');
+  hideStyle.textContent = '.btn-export { display: none !important; }';
+  cd.head.appendChild(hideStyle);
+
+  // 4. Inject agent info + baked properties as a NEW script block at end of body
+  //    This runs AFTER the main script so all functions are already defined
+  const dataScript = cd.createElement('script');
+  dataScript.textContent = `
+// ── CLIENT COPY — BAKED DATA ──
+const CLIENT_MODE  = true;
+const AGENT_NAME   = ${JSON.stringify(agentName)};
+const AGENT_PHONE  = ${JSON.stringify(agentPhone)};
+const AGENT_EMAIL  = ${JSON.stringify(agentEmail)};
+const CLIENT_NAME  = ${JSON.stringify(clientName)};
+
+// Auto-load properties and show agent bar as soon as DOM is ready
+(function init() {
+  // Inject agent info bar below header
+  const hdr = document.querySelector('header');
+  if (hdr) {
+    const bar = document.createElement('div');
+    bar.style.cssText = [
+      'background:#1e2332',
+      'border-bottom:1px solid #2a3045',
+      'padding:9px 24px',
+      'font-size:12px',
+      'color:#94a3b8',
+      'display:flex',
+      'justify-content:space-between',
+      'align-items:center'
+    ].join(';');
+    const clientPart = CLIENT_NAME
+      ? ' &nbsp;·&nbsp; Prepared for <strong style="color:#e2e8f0;font-size:13px">' + CLIENT_NAME + '</strong>'
+      : '';
+    bar.innerHTML =
+      '<span>Prepared by <strong style="color:#e2e8f0;font-size:13px">' + AGENT_NAME + '</strong>' +
+      ' &nbsp;·&nbsp; ' + AGENT_PHONE +
+      ' &nbsp;·&nbsp; <a href="mailto:' + AGENT_EMAIL + '" style="color:#3b82f6;text-decoration:none">' + AGENT_EMAIL + '</a>' +
+      clientPart +
+      '</span>';
+    hdr.insertAdjacentElement('afterend', bar);
+  }
+
+  // Load baked properties
+  const baked = ${propsJSON};
+  properties = baked;
+
+  // Hide upload UI (belt + suspenders — they were removed from DOM but just in case)
+  ['dropzone','paste-section'].forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+
+  // Update status line
+  const st = document.getElementById('status');
+  if (st) {
+    st.textContent = '✓ ' + properties.length + ' properties — prepared by ' + AGENT_NAME;
+    st.className   = 'done';
+  }
+
+  // Re-attach offer overlay listeners (serialization drops runtime listeners)
+  const offerClose = document.getElementById('offer-close');
+  const offerOvl   = document.getElementById('offer-overlay');
+  if (offerClose) offerClose.onclick = function() {
+    offerOvl.classList.remove('open');
+    offerPropIdx = null;
+  };
+  if (offerOvl) offerOvl.onclick = function(e) {
+    if (e.target === this) { this.classList.remove('open'); offerPropIdx = null; }
+  };
+
+  // Re-attach export modal listeners (export-overlay was removed but close btn may linger)
+  const exportOvl = document.getElementById('export-overlay');
+  if (exportOvl) exportOvl.remove();
+
+  // Render the table
+  renderTable();
+})();
+`;
+  cd.body.appendChild(dataScript);
+
+  // 5. Serialize and download
+  const html = '<!DOCTYPE html>\n' + cd.documentElement.outerHTML;
+  const blob  = new Blob([html], { type: 'text/html' });
+  const url   = URL.createObjectURL(blob);
+  const a     = document.createElement('a');
+  a.href      = url;
+  const _now = new Date();
+  const _date = _now.toISOString().slice(0,10);
+  const _time = _now.toTimeString().slice(0,8).replace(/:/g,'');
+  const exportFilename = `ClientDeck_${agentName.replace(/\s+/g,'_')}${clientName ? '_for_'+clientName.replace(/\s+/g,'_') : ''}_${_date}_${_time}.html`;
+  a.download  = exportFilename;
+  a.click();
+  URL.revokeObjectURL(url);
+
+  document.getElementById('export-overlay').classList.remove('open');
+  setStatus(`✓ Client copy exported for ${agentName} — ${properties.length} properties baked in`, 'done');
+
+  // 6. Show GitHub link modal & auto-upload if token exists
+  const githubUsername = localStorage.getItem('gh_username') || '';
+  const githubRepo     = localStorage.getItem('gh_repo')     || '';
+  const githubToken    = localStorage.getItem('gh_token')    || '';
+
+  if (!githubUsername || !githubRepo) {
+    document.getElementById('export-overlay').classList.remove('open');
+    alert('⚙️ GitHub not configured!\n\nClick the ⚙️ Settings button and enter your GitHub username, repository name, and Personal Access Token before exporting.');
+    openSettings();
+    return;
+  }
+  const githubBase     = `https://${githubUsername}.github.io/${githubRepo}/`;
+  const githubLink     = githubBase + exportFilename;
+
+  document.getElementById('github-link-display').textContent = githubLink;
+  document.getElementById('github-link-display').setAttribute('data-link', githubLink);
+  document.getElementById('github-overlay').classList.add('open');
+
+  if (githubToken) {
+    // Auto-upload to GitHub
+    document.getElementById('github-modal-title').textContent = '📤 Uploading to GitHub...';
+    document.getElementById('github-modal-sub').textContent = 'Please wait while your deck is uploaded.';
+    document.getElementById('github-link-display').style.display = 'none';
+    document.getElementById('github-steps').style.display = 'none';
+    document.getElementById('btn-copy-link').style.display = 'none';
+
+    const apiUrl = `https://api.github.com/repos/${githubUsername}/${githubRepo}/contents/${exportFilename}`;
+    const content = btoa(unescape(encodeURIComponent(html)));
+
+    fetch(apiUrl, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `token ${githubToken}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        message: `Add client deck: ${exportFilename}`,
+        content: content
+      })
+    })
+    .then(res => {
+      if (res.ok || res.status === 201) {
+        document.getElementById('github-modal-title').textContent = '✅ Deck Live on GitHub!';
+        document.getElementById('github-modal-sub').textContent = 'Your client deck is uploaded and the link is ready to share.';
+      } else {
+        throw new Error('Upload failed');
+      }
+    })
+    .catch(() => {
+      document.getElementById('github-modal-title').textContent = '⚠️ Auto-upload failed';
+      document.getElementById('github-modal-sub').textContent = 'Upload manually via GitHub. Your deck was still downloaded.';
+      document.getElementById('github-steps').style.display = 'block';
+    })
+    .finally(() => {
+      document.getElementById('github-link-display').style.display = 'block';
+      document.getElementById('btn-copy-link').style.display = 'block';
+    });
+  } else {
+    // No token — show manual instructions
+    document.getElementById('github-modal-title').textContent = '📤 Deck Exported!';
+    document.getElementById('github-modal-sub').textContent = 'Upload the file to GitHub, then share this link:';
+    document.getElementById('github-link-display').style.display = 'block';
+    document.getElementById('github-steps').style.display = 'block';
+    document.getElementById('btn-copy-link').style.display = 'block';
+  }
+}
+
+document.getElementById('github-close').onclick = () =>
+  document.getElementById('github-overlay').classList.remove('open');
+document.getElementById('github-overlay').onclick = function(e) {
+  if (e.target === this) this.classList.remove('open');
+};
+
+// Settings modal
+function openSettings() {
+  document.getElementById('gh-token').value    = localStorage.getItem('gh_token')    || '';
+  document.getElementById('gh-username').value = localStorage.getItem('gh_username') || '';
+  document.getElementById('gh-repo').value     = localStorage.getItem('gh_repo')     || '';
+  document.getElementById('settings-status').textContent = '';
+  document.getElementById('settings-overlay').classList.add('open');
+}
+function saveSettings() {
+  const token    = document.getElementById('gh-token').value.trim();
+  const username = document.getElementById('gh-username').value.trim();
+  const repo     = document.getElementById('gh-repo').value.trim();
+  if (!username || !repo) { alert('Please fill in username and repository name.'); return; }
+  localStorage.setItem('gh_token',    token);
+  localStorage.setItem('gh_username', username);
+  localStorage.setItem('gh_repo',     repo);
+  const btn = document.getElementById('btn-save-settings');
+  btn.textContent = '✓ Saved!';
+  btn.classList.add('saved');
+  document.getElementById('settings-status').textContent = token ? '✓ Auto-upload enabled' : 'Token not set — manual upload mode';
+  setTimeout(() => {
+    btn.textContent = '💾 Save Settings';
+    btn.classList.remove('saved');
+    document.getElementById('settings-overlay').classList.remove('open');
+  }, 1500);
+}
+document.getElementById('settings-close').onclick = () =>
+  document.getElementById('settings-overlay').classList.remove('open');
+document.getElementById('settings-overlay').onclick = function(e) {
+  if (e.target === this) this.classList.remove('open');
+};
+
+function copyGithubLink() {
+  const link = document.getElementById('github-link-display').getAttribute('data-link');
+  navigator.clipboard.writeText(link).then(() => {
+    const btn = document.getElementById('btn-copy-link');
+    btn.textContent = '✓ Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => {
+      btn.textContent = '📋 Copy Link';
+      btn.classList.remove('copied');
+    }, 2000);
+  });
+}
+
+document.getElementById('offer-close').onclick = () => {
+  document.getElementById('offer-overlay').classList.remove('open');
+  offerPropIdx = null;
+};
+document.getElementById('offer-overlay').onclick = function(e) {
+  if (e.target === this) { this.classList.remove('open'); offerPropIdx = null; }
+};
+
+</script>
+
+
+<script>
+// ── CLIENT COPY — BAKED DATA ──
+const CLIENT_MODE  = true;
+const AGENT_NAME   = "j";
+const AGENT_PHONE  = "j";
+const AGENT_EMAIL  = "j";
+const CLIENT_NAME  = "mr man";
+
+// Auto-load properties and show agent bar as soon as DOM is ready
+(function init() {
+  // Inject agent info bar below header
+  const hdr = document.querySelector('header');
+  if (hdr) {
+    const bar = document.createElement('div');
+    bar.style.cssText = [
+      'background:#1e2332',
+      'border-bottom:1px solid #2a3045',
+      'padding:9px 24px',
+      'font-size:12px',
+      'color:#94a3b8',
+      'display:flex',
+      'justify-content:space-between',
+      'align-items:center'
+    ].join(';');
+    const clientPart = CLIENT_NAME
+      ? ' &nbsp;·&nbsp; Prepared for <strong style="color:#e2e8f0;font-size:13px">' + CLIENT_NAME + '</strong>'
+      : '';
+    bar.innerHTML =
+      '<span>Prepared by <strong style="color:#e2e8f0;font-size:13px">' + AGENT_NAME + '</strong>' +
+      ' &nbsp;·&nbsp; ' + AGENT_PHONE +
+      ' &nbsp;·&nbsp; <a href="mailto:' + AGENT_EMAIL + '" style="color:#3b82f6;text-decoration:none">' + AGENT_EMAIL + '</a>' +
+      clientPart +
+      '</span>';
+    hdr.insertAdjacentElement('afterend', bar);
+  }
+
+  // Load baked properties
+  const baked = [{"address":"567 E 128th St, Cleveland, OH 44108","zip":"44108","mlsNum":"5198515","subType":"Duplex","listPrice":95000,"dom":4,"yrBuilt":1914,"annualTax":1281,"taxYear":"2025","parcelId":"111-14-005","units":[{"type":"4 Bedroom","beds":4,"baths":1,"sqft":567,"listedRent":0,"effectiveRent":1600,"rentSource":"call","rentFlag":"📞","occupied":true},{"type":"2 Bedroom","beds":2,"baths":1,"sqft":569,"listedRent":0,"effectiveRent":1160,"rentSource":"call","rentFlag":"📞","occupied":true}],"status":"Active","grade":"D"}];
+  properties = baked;
+
+  // Hide upload UI (belt + suspenders — they were removed from DOM but just in case)
+  ['dropzone','paste-section'].forEach(function(id) {
+    const el = document.getElementById(id);
+    if (el) el.style.display = 'none';
+  });
+
+  // Update status line
+  const st = document.getElementById('status');
+  if (st) {
+    st.textContent = '✓ ' + properties.length + ' properties — prepared by ' + AGENT_NAME;
+    st.className   = 'done';
+  }
+
+  // Re-attach offer overlay listeners (serialization drops runtime listeners)
+  const offerClose = document.getElementById('offer-close');
+  const offerOvl   = document.getElementById('offer-overlay');
+  if (offerClose) offerClose.onclick = function() {
+    offerOvl.classList.remove('open');
+    offerPropIdx = null;
+  };
+  if (offerOvl) offerOvl.onclick = function(e) {
+    if (e.target === this) { this.classList.remove('open'); offerPropIdx = null; }
+  };
+
+  // Re-attach export modal listeners (export-overlay was removed but close btn may linger)
+  const exportOvl = document.getElementById('export-overlay');
+  if (exportOvl) exportOvl.remove();
+
+  // Render the table
+  renderTable();
+})();
+</script></body></html>
